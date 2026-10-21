@@ -9857,7 +9857,19 @@ function cycleAircraft(
   );
   return candidates[(currentIndex + 1) % candidates.length].id;
 }
+
+// Sandbox numeric fields capture digits and letters such as r and n, so global
+// hotkeys must not fire while the player is typing into a form control.
+const TYPABLE_INPUT_TYPES = new Set(["email", "number", "password", "search", "tel", "text", "url"]);
+function isTypingTarget(event: KeyboardEvent) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLInputElement) return TYPABLE_INPUT_TYPES.has(target.type);
+  return target instanceof HTMLTextAreaElement;
+}
 addEventListener("keydown", (e) => {
+  if (isTypingTarget(e)) return;
   if (e.code === "Space" && !scenarioBriefingLocked) {
     running = !running;
     activeGuidanceRuntime?.setPaused(!running);
@@ -9866,6 +9878,7 @@ addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "r") location.reload();
 });
 addEventListener("keydown", (e) => {
+  if (isTypingTarget(e)) return;
   if (e.key === "1") {
     cinematic = false;
     viewMode = 1;
