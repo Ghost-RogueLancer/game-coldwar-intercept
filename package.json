@@ -13,6 +13,7 @@
     "postbuild": "npm run verify:seo:built",
     "verify:theme-audio": "node scripts/verify-theme-audio.mjs",
     "verify:app-smoke": "node scripts/verify-app-load-smoke.mjs",
+    "verify:world-scale": "tsc src/scenario-system/world-scale.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-world-scale.mjs",
     "verify:scenario-guidance": "tsc src/scenario-system/types.ts src/scenario-system/guidance-runtime.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-scenario-guidance.mjs",
     "verify:scenario-guidance-ui": "node scripts/verify-scenario-guidance-ui.mjs",
     "verify:scenario-import-preview": "node scripts/verify-scenario-import-preview.mjs",

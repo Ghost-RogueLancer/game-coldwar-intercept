@@ -41,6 +41,7 @@ import {
   vlsLoadOrder,
 } from "./vls";
 import { WEAPON_PROFILES as weaponProfiles } from "./interceptor-data";
+import { DEFAULT_WORLD_UNITS_PER_KM, resolveWorldUnitsPerKm } from "./scenario-system/world-scale";
 import { deterministicProbabilityRoll } from "./probability";
 import {
   DEFAULT_THREAT_ID,
@@ -802,8 +803,8 @@ const chaffClouds: ChaffCloud[] = [];
 const srbocRoundsInFlight: SrbocRound[] = [];
 const vlsLaunchEffects: VlsLaunchEffect[] = [];
 let chaffSerial = 0;
-const WORLD_UNITS_PER_KM = 10,
-  RADAR_PIXELS_PER_WORLD_UNIT = 0.14;
+let worldUnitsPerKm = DEFAULT_WORLD_UNITS_PER_KM;
+const RADAR_PIXELS_PER_WORLD_UNIT = 0.14;
 function defensiveShotRequirement(missile: DefenseTarget, _quality: number) {
   const targetId = defenseSourceForTarget(missile);
   if (missile.entity?.kind === "aircraft") {
@@ -1259,7 +1260,7 @@ function launchInterceptor(
   g.userData.launchPoint = launchPoint;
   interceptors.push(interceptor);
   const launchRange =
-    target.mesh.position.distanceTo(launchShip?.position ?? defender.position) / WORLD_UNITS_PER_KM;
+    target.mesh.position.distanceTo(launchShip?.position ?? defender.position) / worldUnitsPerKm;
   log(
     `${weapon} ${launcherLabel} LAUNCH / ${launchPoint} / ${launchRange.toFixed(1)} km / TRACK ${Math.round((track?.quality ?? 0) * 100)}% / ${doctrine}`,
   );
@@ -3472,6 +3473,11 @@ function applyScenarioToSandbox(compiled: CompiledScenario | null) {
       navalForces: compiled.navalForces.map((force) => ({ ...force, datalinkEra: "cec-enabled" })),
     };
   }
+  // The scenario grid decides how world units map to kilometres. Console distance
+  // readouts and the tactical radar rings follow it, so a scenario authored on a
+  // different scale reports its own distances instead of the sandbox default.
+  worldUnitsPerKm = resolveWorldUnitsPerKm(compiled?.document.simulation.worldUnitsPerKm);
+  tacticalRadar.setWorldScale(worldUnitsPerKm);
   activeCompiledScenario = compiled;
   activeScenarioSession = compiled ? new ScenarioSession(compiled) : null;
   activeScenarioDocument = compiled?.document ?? null;
@@ -7439,7 +7445,7 @@ function updateCombat(dt: number) {
         i.target.mesh.position,
       );
       log(
-        `RIM-67 SEEKER ON / TRACK ${trackId} / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km / HANDOFF +/-${(i.mesh.userData.handoffError / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+        `RIM-67 SEEKER ON / TRACK ${trackId} / ${(range / worldUnitsPerKm).toFixed(1)} km / HANDOFF +/-${(i.mesh.userData.handoffError / worldUnitsPerKm).toFixed(2)} km`,
       );
     }
     const seekerReady =
@@ -7607,7 +7613,7 @@ function updateCombat(dt: number) {
     ) {
       i.mesh.userData.burnThrough = true;
       log(
-        `${i.weapon} ECM BURN-THROUGH / TRACK ${trackId} / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${i.weapon} ECM BURN-THROUGH / TRACK ${trackId} / ${(range / worldUnitsPerKm).toFixed(1)} km`,
       );
     }
     if (decoyCaptured && !i.mesh.userData.decoyCaptured) {
@@ -7890,7 +7896,7 @@ function updateCombat(dt: number) {
         }
         phaseEl.textContent = "TERMINAL INTERCEPT";
         log(
-          `${i.weapon} INTERCEPT / ${(i.distanceTraveled / WORLD_UNITS_PER_KM).toFixed(1)} km / PK ${(pk * 100).toFixed(0)}% / GEOM ${(geometryFactor * 100).toFixed(0)}%${needsIllumination ? " / ILLUMINATED" : ""}`,
+          `${i.weapon} INTERCEPT / ${(i.distanceTraveled / worldUnitsPerKm).toFixed(1)} km / PK ${(pk * 100).toFixed(0)}% / GEOM ${(geometryFactor * 100).toFixed(0)}%${needsIllumination ? " / ILLUMINATED" : ""}`,
         );
       } else {
         settleEngagement(i, "miss");
@@ -7913,7 +7919,7 @@ function updateCombat(dt: number) {
         i.mesh.visible = false;
         i.illuminationBeam.visible = false;
         log(
-          `${i.weapon} MISS / CPA ${(closestEver / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+          `${i.weapon} MISS / CPA ${(closestEver / worldUnitsPerKm).toFixed(2)} km`,
         );
         return;
       }
@@ -7923,7 +7929,7 @@ function updateCombat(dt: number) {
       i.mesh.visible = false;
       i.illuminationBeam.visible = false;
       log(
-        `${i.weapon} MISS / RANGE EXHAUSTED ${(i.distanceTraveled / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${i.weapon} MISS / RANGE EXHAUSTED ${(i.distanceTraveled / worldUnitsPerKm).toFixed(1)} km`,
       );
       return;
     }
@@ -8040,7 +8046,7 @@ function initializePlatformWaveArrivalPlan(missile: Missile) {
         : 0);
   }
   log(
-    `${platform.definition.name} SALVO TIMING / WAVE ${wave} / ${waveMissiles.length} WEAPONS / ARRIVAL WINDOW ${doctrine.arrivalWindow.toFixed(1)}s / TRACK RANGE ${(observedRange / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+    `${platform.definition.name} SALVO TIMING / WAVE ${wave} / ${waveMissiles.length} WEAPONS / ARRIVAL WINDOW ${doctrine.arrivalWindow.toFixed(1)}s / TRACK RANGE ${(observedRange / worldUnitsPerKm).toFixed(1)} km`,
   );
 }
 
@@ -8342,7 +8348,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
   if (m.phase === "terminal" && !m.mesh.userData.seekerOn) {
     m.mesh.userData.seekerOn = true;
     log(
-      `${m.threatType} ACTIVE SEEKER SEARCH / NAV ${(guidanceRange / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+      `${m.threatType} ACTIVE SEEKER SEARCH / NAV ${(guidanceRange / worldUnitsPerKm).toFixed(1)} km`,
     );
     if (m.mesh.userData.terminalAttackMode !== "standard")
       log(
@@ -8368,7 +8374,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
       platformLaunch.terminalSeekerAcquired = true;
       m.mesh.userData.platformGuidanceMode = "ACTIVE HOMING";
       log(
-        `${m.threatType} ACTIVE SEEKER TARGET ACQUIRED / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km / OFF-BORESIGHT ${THREE.MathUtils.radToDeg(offBoresight).toFixed(1)} DEG`,
+        `${m.threatType} ACTIVE SEEKER TARGET ACQUIRED / ${(range / worldUnitsPerKm).toFixed(1)} km / OFF-BORESIGHT ${THREE.MathUtils.radToDeg(offBoresight).toFixed(1)} DEG`,
       );
     }
   }
@@ -8484,7 +8490,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     if (shipEcmEnabled && !m.mesh.userData.shipEcmBurnThrough) {
       m.mesh.userData.shipEcmBurnThrough = true;
       log(
-        `${m.threatType} SHIP ECM BURN-THROUGH / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${m.threatType} SHIP ECM BURN-THROUGH / ${(range / worldUnitsPerKm).toFixed(1)} km`,
       );
     }
   }
@@ -8707,7 +8713,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     m.phase = "destroyed";
     m.mesh.visible = false;
     log(
-      `${m.threatType} SOFT KILL / SRBOC DECOY / CPA ${(closestShipRange / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+      `${m.threatType} SOFT KILL / SRBOC DECOY / CPA ${(closestShipRange / worldUnitsPerKm).toFixed(2)} km`,
     );
     return;
   }
@@ -8728,7 +8734,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     applySubsystemDamage(m, profile.damage);
     destroyMissileVisual(m, "impact");
     log(
-      `${m.threatType} IMPACT / ${profile.damage}% DAMAGE / SAM ${Number.isFinite(nearestSam) ? (nearestSam / WORLD_UNITS_PER_KM).toFixed(1) + " km" : "NONE"} / HULL ${hullIntegrity}%`,
+      `${m.threatType} IMPACT / ${profile.damage}% DAMAGE / SAM ${Number.isFinite(nearestSam) ? (nearestSam / worldUnitsPerKm).toFixed(1) + " km" : "NONE"} / HULL ${hullIntegrity}%`,
     );
     updateShipStatus();
     if (hullIntegrity <= 0) {
@@ -8949,7 +8955,7 @@ function tick(now: number) {
     canvas.dataset.enemyPlatform = enemyPlatform.definition.id;
     canvas.dataset.surfaceRangeKm = (
       enemyPlatform.model.position.distanceTo(defender.position) /
-      WORLD_UNITS_PER_KM
+      worldUnitsPerKm
     ).toFixed(2);
     canvas.dataset.enemyPlatformReady = String(
       states.filter((state) => state === "ready").length,
@@ -9458,7 +9464,7 @@ function tick(now: number) {
   canvas.dataset.aircraftShipRangesKm = airCombat.aircraft
     .map(
       (aircraft) =>
-        `${aircraft.id}:${(aircraft.position.distanceTo(defender.position) / WORLD_UNITS_PER_KM).toFixed(1)}`,
+        `${aircraft.id}:${(aircraft.position.distanceTo(defender.position) / worldUnitsPerKm).toFixed(1)}`,
     )
     .join("|");
   canvas.dataset.airThrustStates = airCombat.aircraft
