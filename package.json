@@ -186,7 +186,8 @@
     "verify:spatial-weather": "tsc src/space-weather/types.ts src/space-weather/spatial-effects.ts src/space-weather/propagation-effects.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-spatial-weather.mjs",
     "verify:c2-space-weather": "tsc src/space-weather/types.ts src/space-weather/catalog.ts src/space-weather/timeline-runtime.ts src/space-weather/propagation-effects.ts src/soviet-c2/era.ts src/soviet-c2/gci-network.ts src/soviet-c2/maritime-targeting.ts src/soviet-c2/fleet-command.ts src/air/aew/command-network.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-c2-space-weather.mjs",
     "verify:arm-emitter-health": "node --experimental-strip-types scripts/verify-arm-emitter-health.mjs",
-    "verify:world-scale": "tsc src/scenario-system/world-scale.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-world-scale.mjs"
+    "verify:world-scale": "tsc src/scenario-system/world-scale.ts --rootDir src --outDir dist-test --module ESNext --moduleResolution bundler --target ES2022 --skipLibCheck && node scripts/verify-world-scale.mjs",
+    "verify:air-engagement-settlement": "node scripts/verify-missile-engagement-settlement.mjs"
   },
   "dependencies": {
     "three": "^0.178.0"

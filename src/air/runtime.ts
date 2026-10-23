@@ -2110,11 +2110,11 @@ export class AirCombatSystem {
             radarCrossSection: 0.12,
             infraredSignature: 2.2,
             alive: true,
-            applyDamage: () => {
-              missile.alive = false;
-              missile.phase = "destroyed";
-              missile.model.visible = false;
-            },
+            // A hard-killed missile is a terminal state like every other one, so it has
+            // to retire through terminateMissile(): that is the only place that settles
+            // the shooter's engagement ledger, and its engagementSettled guard keeps a
+            // same-tick hit/miss resolution from double-decrementing pending.
+            applyDamage: () => this.terminateMissile(missile, "miss"),
             definition: weapon,
             model,
             shooterId: aircraft.id,
