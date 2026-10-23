@@ -2169,6 +2169,33 @@ export class AirCombatSystem {
       }
     }
   }
+
+  /**
+   * The own-ship observation of the aircraft whose transmitter a semi-active seeker depends on,
+   * or undefined when no such observation exists. A semi-active missile only receives, so the
+   * Doppler filter a notch must null belongs to the illuminating platform, not to the missile.
+   *
+   * Resolved from the platform's own track tables only (the same way `AirCombatSystem` resolves
+   * the semi-active illumination cue from `a.tracks`), never from the shooter's authoritative
+   * state: an aircraft that has gone
+   * undetected, or a ship-based designator that produces no air track, degrades to undefined and
+   * the planner keeps today's line-of-sight geometry. The fresher of the organic and link tracks
+   * wins, and only a non-stale one is accepted, because `a.tracks` is never pruned.
+   */
+  private illuminatorObservationFor(
+    a: AirPlatformInstance,
+    missile: AirMissileInstance,
+    time: number,
+  ) {
+    if (missile.definition.guidance !== "semi-active-radar") return undefined;
+    const candidates = [a.tracks.get(missile.shooterId), a.networkTracks.get(missile.shooterId)];
+    let best: AirTrack | undefined;
+    for (const track of candidates)
+      if (track && (!best || track.lastUpdate > best.lastUpdate)) best = track;
+    if (!best || time - best.lastUpdate > 5) return undefined;
+    return best.position.clone();
+  }
+
   private incomingFor(a: AirPlatformInstance, time: number) {
     for (const m of this.missiles.filter(
       (m) => m.alive && opposingSides(a, m) && m.targetId === a.id,
@@ -2672,6 +2699,10 @@ export class AirCombatSystem {
           warning: incoming.warning,
           estimatedTti: defense.timeToImpact,
           guidance: incoming.missile.definition.guidance,
+          // A semi-active seeker only receives; the transmitter whose Doppler filter the notch
+          // must null is the illuminating aircraft. Ship-launched semi-active shooters are not
+          // resolved here, so the planner falls back to the missile's own line of sight.
+          illuminatorPosition: this.illuminatorObservationFor(a, incoming.missile, time),
           preferredSide: a.formationIndex ? 1 : -1,
           altitude: a.position.y,
           speedRatio: a.velocity.length() /
