@@ -2775,7 +2775,7 @@ export class AirCombatSystem {
       const track = passiveTrack as AirTrack | undefined;
       const assignment = this.sovietSead.assignmentFor(a.id, time);
       const assignedTrack = assignment
-        ? [...a.passiveTracks.values()].find(candidate => candidate.passive?.emitterId === assignment.emitterId)
+        ? [...a.passiveTracks.values()].find(candidate => candidate.passive?.emitterId === assignment.emitterId && armEmitterTrackIsAdmissible(candidate, time))
         : undefined;
       const selectedTrack = (assignedTrack ?? track) as AirTrack | undefined;
       const target = selectedTrack ? this.targetById(selectedTrack.targetId, context) : undefined;

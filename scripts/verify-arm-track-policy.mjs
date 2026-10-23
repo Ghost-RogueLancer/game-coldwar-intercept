@@ -59,6 +59,8 @@ const seadSource = read("../src/soviet-c2/sead-runtime.ts");
 const policySource = read("../src/arm/mission-integration.ts");
 assert.ok(runtimeSource.includes("armEmitterTrackIsAdmissible(track, time)"),
   "air/runtime.ts track selection must use the shared predicate");
+assert.ok(runtimeSource.includes("candidate.passive?.emitterId === assignment.emitterId && armEmitterTrackIsAdmissible(candidate, time)"),
+  "an existing assignment must not bypass the live track policy");
 assert.ok(!runtimeSource.includes("track.lastUpdate <= 12 && track.quality >= 0.28"),
   "air/runtime.ts still carries its own copy of the admissibility test");
 assert.ok(seadSource.includes("armEmitterTrackIsAdmissible(t, time)"),
