@@ -2110,11 +2110,11 @@ export class AirCombatSystem {
             radarCrossSection: 0.12,
             infraredSignature: 2.2,
             alive: true,
-            applyDamage: () => {
-              missile.alive = false;
-              missile.phase = "destroyed";
-              missile.model.visible = false;
-            },
+            // A hard-killed missile is a terminal state like every other one, so it has
+            // to retire through terminateMissile(): that is the only place that settles
+            // the shooter's engagement ledger, and its engagementSettled guard keeps a
+            // same-tick hit/miss resolution from double-decrementing pending.
+            applyDamage: () => this.terminateMissile(missile, "miss"),
             definition: weapon,
             model,
             shooterId: aircraft.id,
@@ -3641,7 +3641,7 @@ export class AirCombatSystem {
     }
     if (missile.definition.guidance === "anti-radiation") {
       const emitter = this.armEmitters.emitters.get(`${target.id}:primary-emitter`) ?? emitterFromEntity(target, time, "X");
-      const profile = ARM_WEAPONS[missile.definition.id as "AGM-45A"|"AGM-88A"];
+      const profile = ARM_WEAPONS[missile.definition.id as keyof typeof ARM_WEAPONS];
       if (!profile) { this.terminateMissile(missile,"miss",time); return; }
       const previousArmMode = missile.armSeekerMode ?? "emitter-search";
       const armState = updateArmSeeker({ state:{ mode:previousArmMode as any, targetEmitterId:missile.targetEmitterId, memoryExpiresAt:missile.armMemoryExpiresAt, lastKnownPosition:missile.commandPoint.clone() }, profile, missilePosition:missile.position, emitters:emitter?[emitter]:[], time, dt, sample:roll(this.serial+Math.floor(time*10)) });

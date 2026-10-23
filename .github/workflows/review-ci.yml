@@ -55,6 +55,10 @@ jobs:
 
       - name: Verify ARM track policy and SEAD integration
         run: npm run verify:arm-track-policy && npm run verify:arm-sead
+      - name: Verify air missile engagement settlement
+        run: npm run verify:air-engagement-settlement
+      - name: Verify Soviet SEAD era and seeker coverage
+        run: npm run verify:soviet-sead-era
 
       - name: Check whitespace errors
         shell: bash
