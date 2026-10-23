@@ -43,6 +43,14 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify ARM emitter health and runtime
+        run: npm run verify:arm-emitter-health && npm run verify:arm-runtime
+      - name: Verify ARM catalog ballistics
+        run: node scripts/verify-catalog-record.mjs && node scripts/verify-arm-ballistics.mjs
+
+      - name: Verify ARM seeker lifecycle and flight ceilings
+        run: npm run verify:arm-lifecycle
+
       - name: Verify ARM track policy and SEAD integration
         run: npm run verify:arm-track-policy && npm run verify:arm-sead
 
@@ -107,6 +115,9 @@ jobs:
 
       - name: Verify application loads and advances one frame
         run: npm run verify:app-smoke
+
+      - name: Verify setup fields isolate keyboard shortcuts
+        run: npm run verify:setup-keyboard-focus
 
       - name: Stop browser smoke server
         if: always()
