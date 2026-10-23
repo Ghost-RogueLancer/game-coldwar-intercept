@@ -43,6 +43,8 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify seeker-specific defensive axes
+        run: npm run verify:advanced-air-defense-axis
       - name: Verify scenario scale and Tacview coordinates
         run: npm run verify:world-scale && npm run verify:acmi-export
       - name: Verify ARM emitter health and runtime
