@@ -43,6 +43,9 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify ARM catalog ballistics
+        run: node scripts/verify-catalog-record.mjs && node scripts/verify-arm-ballistics.mjs
+
       - name: Check whitespace errors
         shell: bash
         env:
