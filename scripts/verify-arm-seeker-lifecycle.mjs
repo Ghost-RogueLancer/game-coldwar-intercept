@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { ARM_WEAPONS } from "../src/arm/catalog.ts";
 import { updateArmSeeker } from "../src/arm/seeker-runtime.ts";
+import { readFileSync } from "node:fs";
+import { shouldContinueArmFlight } from "../src/air/missile-runtime.ts";
 
 const base = { id: "cg57:fire-control-emitter", platformId: "cg57", definitionId: "AN-SPG-49-fire-control", position: new THREE.Vector3(80, 0, 0), active: true, mode: "guidance", emissionStrength: 1, lastActivatedAt: 0, lastDeactivatedAt: 0, health: 1, decoy: false, band: "X" };
 const step = (state, profile, emitter, time, sample = .1) => updateArmSeeker({ state, profile, missilePosition: new THREE.Vector3(), emitters: [emitter], time, dt: .2, sample });
@@ -24,4 +26,39 @@ step(harm, ARM_WEAPONS["AGM-88A"], silent, 27);
 assert.equal(harm.mode, "reacquisition");
 step(harm, ARM_WEAPONS["AGM-88A"], base, 28, .1);
 assert.equal(harm.mode, "terminal-home");
-console.log("ARM seeker lifecycle verification passed");
+
+// The anti-radiation timeout must be the catalogue's ceiling, not a stopwatch in the loop.
+const catalogue = readFileSync(new URL("../src/air/catalog.ts", import.meta.url), "utf8");
+const runtimeSource = readFileSync(new URL("../src/air/runtime.ts", import.meta.url), "utf8");
+assert.ok(!/missile\.age > 120/.test(runtimeSource),
+  "the anti-radiation branch must not decide termination from a hardcoded 120 s stopwatch");
+assert.ok(/shouldContinueArmFlight\(/.test(runtimeSource),
+  "the anti-radiation branch must consult shouldContinueArmFlight");
+
+const ceilings = [];
+for (const id of ["AGM-45A", "AGM-88A", "Kh-31P-C"]) {
+  const line = catalogue.split("\n").find(l => l.includes(`"${id}": {`) && l.includes(`id:"${id}"`));
+  assert.ok(line, `${id} is no longer a single-line AIR_WEAPONS definition`);
+  const field = key => {
+    const m = line.match(new RegExp(`(?:^|[^A-Za-z0-9_])${key}:(-?[0-9.]+)`));
+    assert.ok(m, `${id} is missing ${key}`);
+    return Number(m[1]);
+  };
+  const ceiling = field("maximumFlightSeconds");
+  ceilings.push(ceiling);
+  assert.ok(shouldContinueArmFlight({ age: ceiling, maximumFlightSeconds: ceiling }),
+    `${id} must still be flying at exactly its declared ceiling`);
+  assert.equal(shouldContinueArmFlight({ age: ceiling + 0.5, maximumFlightSeconds: ceiling }), false,
+    `${id} must stop past its declared ceiling`);
+  // The ceiling must not clip a maximum-range shot; this is why tightening 120 -> 75 is safe.
+  assert.ok(ceiling * field("speed") >= field("maxRange"),
+    `${id} ceiling x speed must cover maxRange (${ceiling} * ${field("speed")} < ${field("maxRange")})`);
+}
+// Non-vacuity: if every ceiling equalled the old literal, these assertions would prove nothing.
+assert.ok(ceilings.some(c => c !== 120),
+  "no declared ceiling differs from the old literal, so this test cannot detect a regression");
+// A weapon with no flight profile keeps today's behaviour.
+assert.ok(shouldContinueArmFlight({ age: 120 }));
+assert.equal(shouldContinueArmFlight({ age: 120.5 }), false);
+
+console.log("ARM seeker lifecycle verification passed:", JSON.stringify({ ceilings, oldLiteral: 120 }));
