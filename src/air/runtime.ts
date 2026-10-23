@@ -84,6 +84,7 @@ import {
   airToAirMissilePhase,
   stepAirToAirPropulsion,
   shouldContinueAfterTargetLoss,
+  shouldContinueArmFlight,
 } from "./missile-runtime";
 import { updateAntiShipGuidance } from "../anti-ship-guidance";
 import { radarCountermeasureContest } from "../radar-countermeasures";
@@ -3643,7 +3644,11 @@ export class AirCombatSystem {
       if (armState.lastKnownPosition) missile.commandPoint.copy(armState.lastKnownPosition);
       missile.age += dt; this.integrateAirToAirMissile(missile, missile.commandPoint.clone(), dt);
       if (emitter && target.kind !== "decoy" && missile.position.distanceTo(emitter.position)<=missile.definition.proximityRadius) { target.applyDamage(missile.definition.damage,missile.position); this.emit(time,"kill",`${missile.definition.name} ARM EMITTER HIT / ${emitter.id}`); this.terminateMissile(missile,"hit",time); }
-      else if (armState.mode === "lost" || missile.age > 120) this.terminateMissile(missile,"miss",time);
+      else if (armState.mode === "lost" ||
+        !shouldContinueArmFlight({
+          age: missile.age,
+          maximumFlightSeconds: missile.definition.airToAirFlight?.maximumFlightSeconds,
+        })) this.terminateMissile(missile,"miss",time);
       return;
     }
     const range = missile.position.distanceTo(target.position);
