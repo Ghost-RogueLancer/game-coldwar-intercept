@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { observedIlluminatorPosition, tacticalTrackNumber } from "./ai/illuminator-observation.js";
+import { DEFAULT_WORLD_UNITS_PER_KM, resolveWorldUnitsPerKm } from "../scenario-system/world-scale.js";
 import { createAirWeaponModel } from "../models/air-weapons.js";
 import { attachAirWeaponModel } from "./weapon-mounting.js";
 import { applyDeclaredWingSweep } from "./variable-geometry.js";
@@ -360,6 +361,10 @@ export class AirCombatSystem {
   private serial = 0;
   private lastEventIndex = 0;
   private currentTime = 0;
+  private worldUnitsPerKm = DEFAULT_WORLD_UNITS_PER_KM;
+  setWorldScale(declared: number | undefined) {
+    this.worldUnitsPerKm = resolveWorldUnitsPerKm(declared);
+  }
   private activeAdvancedAirAi = false;
   private readonly perceptionBindings = new Map<string, PerceptionBindings>();
   private readonly formationPerceptionBindings =
@@ -2156,7 +2161,7 @@ export class AirCombatSystem {
         this.emit(
           time,
           "launch",
-          `${aircraft.definition.name} LAUNCH ${weapon.name} / AIRFRAME ${aircraft.id} / ${hardpoint.id.toUpperCase()} / TRACK TQ ${Math.round(hardpoint.trackQuality * 100)}% / RANGE ${(launchZone.range / 10).toFixed(1)} KM / RTR ${(launchZone.rTr / 10).toFixed(1)} KM / RMAX ${(launchZone.rMax / 10).toFixed(1)} KM${weapon.guidance === "anti-radiation" ? ` / EMITTER ${missile.targetEmitterId ?? "UNKNOWN"}` : ""}`,
+          `${aircraft.definition.name} LAUNCH ${weapon.name} / AIRFRAME ${aircraft.id} / ${hardpoint.id.toUpperCase()} / TRACK TQ ${Math.round(hardpoint.trackQuality * 100)}% / RANGE ${(launchZone.range / this.worldUnitsPerKm).toFixed(1)} KM / RTR ${(launchZone.rTr / this.worldUnitsPerKm).toFixed(1)} KM / RMAX ${(launchZone.rMax / this.worldUnitsPerKm).toFixed(1)} KM${weapon.guidance === "anti-radiation" ? ` / EMITTER ${missile.targetEmitterId ?? "UNKNOWN"}` : ""}`,
           {
             side:aircraft.side,
             platformId:aircraft.formationId,
