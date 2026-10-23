@@ -43,6 +43,9 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify ARM track policy and SEAD integration
+        run: npm run verify:arm-track-policy && npm run verify:arm-sead
+
       - name: Check whitespace errors
         shell: bash
         env:
