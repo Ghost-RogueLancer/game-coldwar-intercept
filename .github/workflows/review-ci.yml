@@ -43,6 +43,9 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify ARM emitter health and runtime
+        run: npm run verify:arm-emitter-health && npm run verify:arm-runtime
+
       - name: Check whitespace errors
         shell: bash
         env:
