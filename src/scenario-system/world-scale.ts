@@ -15,14 +15,21 @@
 
 /** The scale every built-in scenario declares, and the fallback for the sandbox. */
 export const DEFAULT_WORLD_UNITS_PER_KM = 10;
+// Supported display range keeps projection arithmetic bounded for authored scenarios.
+export const MIN_WORLD_UNITS_PER_KM = 0.001;
+export const MAX_WORLD_UNITS_PER_KM = 1_000_000;
+export function isValidWorldUnitsPerKm(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) &&
+    value >= MIN_WORLD_UNITS_PER_KM && value <= MAX_WORLD_UNITS_PER_KM;
+}
 
 /**
- * Accepts a declared scale and returns a usable one. `undefined`, non-finite, and
- * non-positive values fall back to the default rather than throwing, because the
+ * Accepts a declared scale and returns a usable one. Missing or values outside
+ * the supported finite range fall back rather than throwing, because the
  * sandbox runs before any scenario is compiled and must still read out distances.
  */
 export function resolveWorldUnitsPerKm(declared: number | undefined): number {
-  if (declared === undefined || !Number.isFinite(declared) || declared <= 0)
+  if (!isValidWorldUnitsPerKm(declared))
     return DEFAULT_WORLD_UNITS_PER_KM;
   return declared;
 }
