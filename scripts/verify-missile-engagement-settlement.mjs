@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import ts from "typescript";
 
 // Air-launched missiles are hard-killed by ship air defense (ARCHITECTURE.md:44),
 // and terminateMissile() is the only routine that settles the shooter's engagement
@@ -19,12 +20,37 @@ assert.equal(
   `an air missile may only be retired by terminateMissile(); found ${retirements.length} hand-written assignments`,
 );
 
-const terminator = source.indexOf("private terminateMissile(");
-assert.ok(terminator >= 0, "terminateMissile() must remain the single air missile terminal state");
+const ast = ts.createSourceFile("runtime.ts", source, ts.ScriptTarget.Latest, true);
+let terminator;
+function visit(node) {
+  if (ts.isMethodDeclaration(node) && node.name.getText(ast) === "terminateMissile") terminator = node;
+  ts.forEachChild(node, visit);
+}
+visit(ast);
+assert.ok(terminator?.body, "terminateMissile() must remain the single air missile terminal state");
 assert.ok(
-  retirements[0].index > terminator,
+  retirements[0].index > terminator.body.pos && retirements[0].index < terminator.body.end,
   "the surviving missile.alive assignment must live inside terminateMissile()",
 );
+
+// Exercise the shipped terminal method with a small ledger spy: repeated retirement
+// must not settle the same engagement twice, including a same-frame hit after a kill.
+const method = ts.transpileModule(`class Probe { ${terminator.getText(ast)} }; return Probe;`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const settlements = [];
+const Probe = new Function("resolveEngagement", method)((...args) => settlements.push(args));
+const system = new Probe();
+const ledger = {};
+system.currentTime = 42;
+system.aircraft = [{ id: "shooter", engagements: ledger }];
+const missile = { shooterId: "shooter", engagementTargetId: "ship", alive: true, model: { visible: true } };
+system.terminateMissile(missile, "miss");
+system.terminateMissile(missile, "hit");
+assert.deepEqual(settlements, [[ledger, "ship", "miss", 42]]);
+assert.equal(missile.alive, false);
+assert.equal(missile.model.visible, false);
+assert.equal(missile.phase, "destroyed");
 
 assert.match(
   source,

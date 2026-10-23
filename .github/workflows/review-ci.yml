@@ -43,6 +43,9 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify air missile engagement settlement
+        run: npm run verify:air-engagement-settlement
+
       - name: Check whitespace errors
         shell: bash
         env:
