@@ -12,7 +12,7 @@ export function readCatalogRecord(url, catalogName, id) {
   }
   visit(source);
   const key = node => ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node) ? node.text : undefined;
-  const fail = () => { throw new Error(`Expected literal ${catalogName}[${JSON.stringify(id)}] in ${url}`); };
+  const fail = node => { throw new Error(`Expected literal ${catalogName}[${JSON.stringify(id)}] in ${url}${node ? `; unsupported ${ts.SyntaxKind[node.kind]} at ${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}` : ""}`); };
   function literal(node) {
     if (!node) return fail();
     if (ts.isStringLiteral(node)) return node.text;
@@ -26,10 +26,10 @@ export function readCatalogRecord(url, catalogName, id) {
     }
     if (ts.isArrayLiteralExpression(node)) return node.elements.map(literal);
     if (ts.isObjectLiteralExpression(node)) return Object.fromEntries(node.properties.map(property => {
-      if (!ts.isPropertyAssignment(property) || key(property.name) === undefined) return fail();
+      if (!ts.isPropertyAssignment(property) || key(property.name) === undefined) return fail(property);
       return [key(property.name), literal(property.initializer)];
     }));
-    return fail();
+    return fail(node);
   }
   if (!catalog || !ts.isObjectLiteralExpression(catalog)) return fail();
   const entry = catalog.properties.find(property => ts.isPropertyAssignment(property) && key(property.name) === id);

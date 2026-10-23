@@ -6,6 +6,8 @@ import { stepAirToAirPropulsion } from "../src/air/missile-runtime.ts";
 const ARM_IDS = ["AGM-45A", "AGM-88A", "Kh-31P-C"];
 function readWeapon(id) {
   const weapon = readCatalogRecord(new URL("../src/air/catalog.ts", import.meta.url), "AIR_WEAPONS", id);
+  assert.ok(weapon.airToAirFlight && typeof weapon.airToAirFlight === "object" && !Array.isArray(weapon.airToAirFlight),
+    `${id}.airToAirFlight must be a literal object`);
   const result = { ...weapon, ...weapon.airToAirFlight };
   for (const field of ["speed", "boostSeconds", "maxTurnRateDeg", "sustainSeconds", "coastDragPerSecond", "minimumSpeedFactor", "loftAltitude", "loftTransitionRange", "maximumFlightSeconds"]) {
     assert.ok(Number.isFinite(result[field]), `${id}.${field} must be finite`);
