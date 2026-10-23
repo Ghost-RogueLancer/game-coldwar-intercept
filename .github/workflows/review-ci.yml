@@ -105,6 +105,9 @@ jobs:
       - name: Verify application loads and advances one frame
         run: npm run verify:app-smoke
 
+      - name: Verify setup fields isolate keyboard shortcuts
+        run: npm run verify:setup-keyboard-focus
+
       - name: Stop browser smoke server
         if: always()
         shell: bash
