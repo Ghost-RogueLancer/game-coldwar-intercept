@@ -32,6 +32,7 @@ export function readCatalogRecord(url, catalogName, id) {
     return fail(node);
   }
   if (!catalog || !ts.isObjectLiteralExpression(catalog)) return fail();
+  if (id === undefined) return literal(catalog);
   const entry = catalog.properties.find(property => ts.isPropertyAssignment(property) && key(property.name) === id);
   return literal(entry?.initializer);
 }
