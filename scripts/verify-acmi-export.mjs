@@ -187,6 +187,15 @@ const acmi = exportTacviewAcmi(
   },
 );
 assert(acmi.startsWith("FileType=text/acmi/tacview\nFileVersion=2.2"), "invalid ACMI header");
+const projectionOptions = { title: "Scale test", referenceTime: new Date(0), blueShipName: "Scale probe", referenceLatitude: 0, referenceLongitude: 0 };
+const projectionSnapshot = [{ ...base, time: 0, ship: { ...base.ship, x: 100, z: -100, y: 10 } }];
+const project = scale => exportTacviewAcmi(projectionSnapshot, [], { ...projectionOptions, worldUnitsPerKm: scale });
+assert(project(undefined) === project(10), "default ACMI coordinates must stay compatible");
+const coord = scale => project(scale).match(/T=([^,\n]+)/)[1].split("|").map(Number);
+const defaultCoord = coord(10), scaledCoord = coord(25);
+assert(Math.abs(scaledCoord[0] - defaultCoord[0] * .4) < 1e-7, "ACMI longitude ignores scale");
+assert(Math.abs(scaledCoord[1] - defaultCoord[1] * .4) < 1e-7, "ACMI latitude ignores scale");
+assert(scaledCoord[2] === defaultCoord[2] && scaledCoord[2] === 500, "horizontal scale must preserve altitude convention");
 assert(acmi.includes("0,ReferenceTime=2026-07-23T00:00:00.000Z"), "reference time missing");
 assert(acmi.includes("Name=F-14A Tomcat,Coalition=Blue"), "aircraft identity missing");
 const fighterLine = acmi.split("\n").find((line) => line.includes("Name=F-14A Tomcat"));
