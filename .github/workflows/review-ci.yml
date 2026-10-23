@@ -53,6 +53,9 @@ jobs:
       - name: Verify ARM seeker lifecycle and flight ceilings
         run: npm run verify:arm-lifecycle
 
+      - name: Verify Soviet SEAD era and seeker coverage
+        run: npm run verify:soviet-sead-era
+
       - name: Check whitespace errors
         shell: bash
         env:

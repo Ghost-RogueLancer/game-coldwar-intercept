@@ -3641,7 +3641,7 @@ export class AirCombatSystem {
     }
     if (missile.definition.guidance === "anti-radiation") {
       const emitter = this.armEmitters.emitters.get(`${target.id}:primary-emitter`) ?? emitterFromEntity(target, time, "X");
-      const profile = ARM_WEAPONS[missile.definition.id as "AGM-45A"|"AGM-88A"];
+      const profile = ARM_WEAPONS[missile.definition.id as keyof typeof ARM_WEAPONS];
       if (!profile) { this.terminateMissile(missile,"miss",time); return; }
       const previousArmMode = missile.armSeekerMode ?? "emitter-search";
       const armState = updateArmSeeker({ state:{ mode:previousArmMode as any, targetEmitterId:missile.targetEmitterId, memoryExpiresAt:missile.armMemoryExpiresAt, lastKnownPosition:missile.commandPoint.clone() }, profile, missilePosition:missile.position, emitters:emitter?[emitter]:[], time, dt, sample:roll(this.serial+Math.floor(time*10)) });
