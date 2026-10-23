@@ -22,6 +22,7 @@ const failures = [];
 const readState = () => page.locator("#scene").evaluate((canvas) => ({
   viewMode: canvas.dataset.cameraViewMode ?? "",
   elapsed: canvas.dataset.simulationElapsed ?? "",
+  network: canvas.dataset.networkObserverMode ?? "",
 }));
 const readFocus = () => page.evaluate(() => {
   const element = document.activeElement;
@@ -41,7 +42,8 @@ try {
   });
   await page.locator("#scene").waitFor({ state: "visible", timeout: 10_000 });
   await page.evaluate(() => { window.__cwiKeyboardFocusProbe = "alive"; });
-  await page.waitForTimeout(250);
+  await page.locator("#sbCount").waitFor({ state: "visible" });
+  await page.waitForFunction(() => Boolean(document.querySelector("#scene")?.dataset.cameraViewMode));
 
   // The setup panel only hides on START, so this pass runs the player's very
   // first interaction: typing counts and coordinates into the number fields.
@@ -50,7 +52,7 @@ try {
 
   // A digit must still switch the camera when nothing is being typed into.
   await page.keyboard.press("9");
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => document.querySelector("#scene")?.dataset.cameraViewMode === "9");
   const unfocused = await readState();
   if (unfocused.viewMode !== "9")
     failures.push(`unfocused 9 did not switch the view: ${initial.viewMode} -> ${unfocused.viewMode}`);
@@ -75,13 +77,15 @@ try {
   // Letters must not reload the mission while a field owns the caret.
   await page.keyboard.press("r");
   await page.keyboard.press("n");
+  await page.keyboard.press("Shift+n");
   await page.waitForTimeout(500);
+  if ((await readState()).network !== initial.network) failures.push("typing n changed the network view");
   const probe = await page.evaluate(() => window.__cwiKeyboardFocusProbe ?? "gone");
   if (probe !== "alive") failures.push("pressing r inside #sbCount reloaded the page");
 
   await page.locator("#sbCount").evaluate((element) => element.blur());
   await page.keyboard.press("2");
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => document.querySelector("#scene")?.dataset.cameraViewMode === "2");
   const restored = await readState();
   if (restored.viewMode !== "2")
     failures.push(`hotkey stayed blocked after leaving the field: ${restored.viewMode}`);
