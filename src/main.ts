@@ -42,6 +42,7 @@ import {
   vlsLoadOrder,
 } from "./vls";
 import { WEAPON_PROFILES as weaponProfiles } from "./interceptor-data";
+import { DEFAULT_WORLD_UNITS_PER_KM, resolveWorldUnitsPerKm } from "./scenario-system/world-scale";
 import { deterministicProbabilityRoll } from "./probability";
 import {
   DEFAULT_THREAT_ID,
@@ -803,8 +804,8 @@ const chaffClouds: ChaffCloud[] = [];
 const srbocRoundsInFlight: SrbocRound[] = [];
 const vlsLaunchEffects: VlsLaunchEffect[] = [];
 let chaffSerial = 0;
-const WORLD_UNITS_PER_KM = 10,
-  RADAR_PIXELS_PER_WORLD_UNIT = 0.14;
+let worldUnitsPerKm = DEFAULT_WORLD_UNITS_PER_KM;
+const RADAR_PIXELS_PER_WORLD_UNIT = 0.14;
 function defensiveShotRequirement(missile: DefenseTarget, _quality: number) {
   const targetId = defenseSourceForTarget(missile);
   if (missile.entity?.kind === "aircraft") {
@@ -1260,7 +1261,7 @@ function launchInterceptor(
   g.userData.launchPoint = launchPoint;
   interceptors.push(interceptor);
   const launchRange =
-    target.mesh.position.distanceTo(launchShip?.position ?? defender.position) / WORLD_UNITS_PER_KM;
+    target.mesh.position.distanceTo(launchShip?.position ?? defender.position) / worldUnitsPerKm;
   log(
     `${weapon} ${launcherLabel} LAUNCH / ${launchPoint} / ${launchRange.toFixed(1)} km / TRACK ${Math.round((track?.quality ?? 0) * 100)}% / ${doctrine}`,
   );
@@ -2480,7 +2481,7 @@ function updateRaidCard(
   if (!enemyPlatform) {
     raidIndex.textContent = "AIR";
     raidTitle.textContent = "RAID STATUS";
-    targetCount.textContent = `${liveAir} ACTIVE / ${reserveAir} RESERVE / ${(maxAirRange / 10).toFixed(1)} km`;
+    targetCount.textContent = `${liveAir} ACTIVE / ${reserveAir} RESERVE / ${(maxAirRange / worldUnitsPerKm).toFixed(1)} km`;
     return;
   }
   const track = surfacePicture.trackForTarget(1),
@@ -2492,7 +2493,7 @@ function updateRaidCard(
     ? enemyPlatform.definition.name
     : "SURFACE CONTACT";
   targetCount.textContent = track
-    ? `${liveAir} AIR / ${(track.position.distanceTo(defender.position) / 10).toFixed(1)} km / TQ ${Math.round(quality * 100)}%${track.horizonLimited ? " / HORIZON LIMITED" : " / LOS"} / EW ${ecmEnabled ? "ON" : "OFF"}`
+    ? `${liveAir} AIR / ${(track.position.distanceTo(defender.position) / worldUnitsPerKm).toFixed(1)} km / TQ ${Math.round(quality * 100)}%${track.horizonLimited ? " / HORIZON LIMITED" : " / LOS"} / EW ${ecmEnabled ? "ON" : "OFF"}`
     : `${liveAir} AIR / SEARCHING / EW ${ecmEnabled ? "ON" : "OFF"}`;
   let bda = "BDA PENDING";
   if (
@@ -2955,7 +2956,7 @@ const airScenarioContext = createAirScenarioContext(() => {
         position: track.position,
         velocity: track.velocity,
         quality: track.quality,
-        uncertainty: track.uncertainty / 100,
+        uncertainty: track.uncertainty * worldUnitsPerKm / 1000,
         lastUpdate: track.lastSeen,
         classification:
           target.entity.kind === "aircraft"
@@ -3473,6 +3474,12 @@ function applyScenarioToSandbox(compiled: CompiledScenario | null) {
       navalForces: compiled.navalForces.map((force) => ({ ...force, datalinkEra: "cec-enabled" })),
     };
   }
+  // The scenario grid decides how world units map to kilometres. Console distance
+  // readouts and the tactical radar rings follow it, so a scenario authored on a
+  // different scale reports its own distances instead of the sandbox default.
+  worldUnitsPerKm = resolveWorldUnitsPerKm(compiled?.document.simulation.worldUnitsPerKm);
+  tacticalRadar.setWorldScale(worldUnitsPerKm);
+  airCombat.setWorldScale(worldUnitsPerKm);
   activeCompiledScenario = compiled;
   activeScenarioSession = compiled ? new ScenarioSession(compiled) : null;
   activeScenarioDocument = compiled?.document ?? null;
@@ -4939,6 +4946,7 @@ function tacviewFilename() {
 function exportCurrentTacview() {
   const acmi = exportTacviewAcmi(aarSnapshots, aarEvents, {
     title: `${activeShip.name} After Action Review`,
+    worldUnitsPerKm,
     referenceTime: new Date(),
     blueShipName: `${activeShip.name} ${activeShip.hullNumber}`,
   });
@@ -5179,7 +5187,7 @@ const fireButton = controlButton("LAUNCH SAM", () => {
   const range = target.mesh.position.distanceTo(defender.position);
   if (range < profile.minRange || range > profile.maxRange) {
     log(
-      `LAUNCH INHIBIT / ${selectedWeapon} ENVELOPE ${(profile.minRange / 10).toFixed(1)}-${(profile.maxRange / 10).toFixed(1)} km`,
+      `LAUNCH INHIBIT / ${selectedWeapon} ENVELOPE ${(profile.minRange / worldUnitsPerKm).toFixed(1)}-${(profile.maxRange / worldUnitsPerKm).toFixed(1)} km`,
     );
     return;
   }
@@ -6176,7 +6184,7 @@ setInterval(() => {
           RADAR_PIXELS_PER_WORLD_UNIT,
       uncertainty = Math.max(
         3,
-        (surfaceTrack.uncertainty / 100) * RADAR_PIXELS_PER_WORLD_UNIT,
+        (surfaceTrack.uncertainty * worldUnitsPerKm / 1000) * RADAR_PIXELS_PER_WORLD_UNIT,
       );
     radarCtx.strokeStyle = surfaceTrack.quality > 0.62 ? "#ff6758" : "#ffb347";
     radarCtx.fillStyle = "#ff6758";
@@ -6231,7 +6239,7 @@ setInterval(() => {
             : "#bd78ff",
       uncertainty = Math.max(
         2,
-        (track.uncertainty / 100) * RADAR_PIXELS_PER_WORLD_UNIT,
+        (track.uncertainty * worldUnitsPerKm / 1000) * RADAR_PIXELS_PER_WORLD_UNIT,
       );
     radarCtx.strokeStyle = color;
     radarCtx.globalAlpha = 0.28;
@@ -6389,7 +6397,7 @@ function planSurfaceStrike(manual = false) {
   if (range < strike.minRange || range > strike.maxRange) {
     if (manual)
       log(
-        `SURFACE STRIKE INHIBIT / RANGE ${(range / 10).toFixed(1)} km / ENVELOPE ${(strike.minRange / 10).toFixed(1)}-${(strike.maxRange / 10).toFixed(1)} km`,
+        `SURFACE STRIKE INHIBIT / RANGE ${(range / worldUnitsPerKm).toFixed(1)} km / ENVELOPE ${(strike.minRange / worldUnitsPerKm).toFixed(1)}-${(strike.maxRange / worldUnitsPerKm).toFixed(1)} km`,
       );
     return false;
   }
@@ -6468,7 +6476,7 @@ function planSurfaceStrike(manual = false) {
   surfaceRequiredHits = salvoPlan.requiredHits;
   surfacePlanningLeakProbability = salvoPlan.planningLeakProbability;
   log(
-    `SURFACE OODA / WAVE ${surfaceStrikeWave} / ${manual ? "MANUAL" : "AUTO"} / ${count} x ${strike.weapon} / ${salvoPlan.requiredHits} HITS REQUIRED / PLEAK ${Math.round(salvoPlan.planningLeakProbability * 100)}% / ROUTE +/-${(strike.routeLateralOffset / 10).toFixed(1)} km / TOT WINDOW ${strike.arrivalWindow.toFixed(1)}s / ${solution.passive ? "PASSIVE CUE" : `TRACK ${track.id}`} TQ ${Math.round(track.quality * 100)}% / UNC ${(track.uncertainty / 10).toFixed(1)} km / ${(range / 10).toFixed(1)} km`,
+    `SURFACE OODA / WAVE ${surfaceStrikeWave} / ${manual ? "MANUAL" : "AUTO"} / ${count} x ${strike.weapon} / ${salvoPlan.requiredHits} HITS REQUIRED / PLEAK ${Math.round(salvoPlan.planningLeakProbability * 100)}% / ROUTE +/-${(strike.routeLateralOffset / worldUnitsPerKm).toFixed(1)} km / TOT WINDOW ${strike.arrivalWindow.toFixed(1)}s / ${solution.passive ? "PASSIVE CUE" : `TRACK ${track.id}`} TQ ${Math.round(track.quality * 100)}% / UNC ${(track.uncertainty / worldUnitsPerKm).toFixed(1)} km / ${(range / worldUnitsPerKm).toFixed(1)} km`,
   );
   return true;
 }
@@ -6546,7 +6554,7 @@ function updateSurfaceCombat(
     surfaceEsmCue.valid = true;
     if (firstCue)
       log(
-        `SURFACE ESM / BEARING CUE / UNC ${(surfaceEsmCue.uncertainty / 10).toFixed(1)} km / RADAR EMITTER DETECTED`,
+        `SURFACE ESM / BEARING CUE / UNC ${(surfaceEsmCue.uncertainty / worldUnitsPerKm).toFixed(1)} km / RADAR EMITTER DETECTED`,
       );
   } else if (!opforRadarEnabled || esmHealth <= 0.04) {
     surfaceEsmCue.valid = false;
@@ -6573,7 +6581,7 @@ function updateSurfaceCombat(
       surfaceFireControlReadyLogged = false;
       log(
         targeting.passive
-          ? `SURFACE PASSIVE CUE / SEARCH AREA BUILD / UNC ${(targetingTrack.uncertainty / 10).toFixed(1)} km`
+          ? `SURFACE PASSIVE CUE / SEARCH AREA BUILD / UNC ${(targetingTrack.uncertainty / worldUnitsPerKm).toFixed(1)} km`
           : `SURFACE TRACK ${targetingTrack.id} / CONTINUITY BUILD`,
       );
     }
@@ -6698,7 +6706,7 @@ function updateSurfaceCombat(
       log(`RGM-84 HARPOON ${missile.id} ACTIVE SEEKER / SEARCH`);
     else if (event.kind === "seeker-acquired")
       log(
-        `RGM-84 HARPOON ${missile.id} TARGET ACQUIRED / ${(event.range / 10).toFixed(1)} km / OFF-BORESIGHT ${event.offBoresightDeg.toFixed(1)} DEG`,
+        `RGM-84 HARPOON ${missile.id} TARGET ACQUIRED / ${(event.range / worldUnitsPerKm).toFixed(1)} km / OFF-BORESIGHT ${event.offBoresightDeg.toFixed(1)} DEG`,
       );
     else if (event.kind === "miss") {
       surfaceMisses++;
@@ -6709,7 +6717,7 @@ function updateSurfaceCombat(
       log(`HARPOON ${missile.id} MISS / ${event.reason}`);
     } else if (event.kind === "platform-track")
       log(
-        `${missile.target.definition.name} INCOMING TRACK / HARPOON ${missile.id} / TQ ${Math.round(event.quality * 100)}% / ${(event.range / 10).toFixed(1)} km`,
+        `${missile.target.definition.name} INCOMING TRACK / HARPOON ${missile.id} / TQ ${Math.round(event.quality * 100)}% / ${(event.range / worldUnitsPerKm).toFixed(1)} km`,
       );
     else if (event.kind === "point-defense-ready")
       log(
@@ -7353,7 +7361,7 @@ function updateCombat(dt: number) {
               ? "OUT OF ENVELOPE"
               : "IN RANGE";
     threatName.textContent = `TRACK ${selectedTrack ? String(selectedTrack.id).padStart(2, "0") : "--"} / ${selectedTrack?.classification === "classified" ? selected.threatType : (selectedTrack?.classification.toUpperCase() ?? "PENDING ID")}`;
-    threatRange.textContent = `${(range / 10).toFixed(1)} km`;
+    threatRange.textContent = `${(range / worldUnitsPerKm).toFixed(1)} km`;
     threatAltitude.textContent = selectedTrack
       ? fireControl
         ? `${Math.round(selectedTrack.altitudeEstimate)} m / +/-${Math.round(selectedTrack.altitudeUncertainty)} m`
@@ -7440,7 +7448,7 @@ function updateCombat(dt: number) {
         i.target.mesh.position,
       );
       log(
-        `RIM-67 SEEKER ON / TRACK ${trackId} / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km / HANDOFF +/-${(i.mesh.userData.handoffError / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+        `RIM-67 SEEKER ON / TRACK ${trackId} / ${(range / worldUnitsPerKm).toFixed(1)} km / HANDOFF +/-${(i.mesh.userData.handoffError / worldUnitsPerKm).toFixed(2)} km`,
       );
     }
     const seekerReady =
@@ -7608,7 +7616,7 @@ function updateCombat(dt: number) {
     ) {
       i.mesh.userData.burnThrough = true;
       log(
-        `${i.weapon} ECM BURN-THROUGH / TRACK ${trackId} / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${i.weapon} ECM BURN-THROUGH / TRACK ${trackId} / ${(range / worldUnitsPerKm).toFixed(1)} km`,
       );
     }
     if (decoyCaptured && !i.mesh.userData.decoyCaptured) {
@@ -7891,7 +7899,7 @@ function updateCombat(dt: number) {
         }
         phaseEl.textContent = "TERMINAL INTERCEPT";
         log(
-          `${i.weapon} INTERCEPT / ${(i.distanceTraveled / WORLD_UNITS_PER_KM).toFixed(1)} km / PK ${(pk * 100).toFixed(0)}% / GEOM ${(geometryFactor * 100).toFixed(0)}%${needsIllumination ? " / ILLUMINATED" : ""}`,
+          `${i.weapon} INTERCEPT / ${(i.distanceTraveled / worldUnitsPerKm).toFixed(1)} km / PK ${(pk * 100).toFixed(0)}% / GEOM ${(geometryFactor * 100).toFixed(0)}%${needsIllumination ? " / ILLUMINATED" : ""}`,
         );
       } else {
         settleEngagement(i, "miss");
@@ -7914,7 +7922,7 @@ function updateCombat(dt: number) {
         i.mesh.visible = false;
         i.illuminationBeam.visible = false;
         log(
-          `${i.weapon} MISS / CPA ${(closestEver / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+          `${i.weapon} MISS / CPA ${(closestEver / worldUnitsPerKm).toFixed(2)} km`,
         );
         return;
       }
@@ -7924,7 +7932,7 @@ function updateCombat(dt: number) {
       i.mesh.visible = false;
       i.illuminationBeam.visible = false;
       log(
-        `${i.weapon} MISS / RANGE EXHAUSTED ${(i.distanceTraveled / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${i.weapon} MISS / RANGE EXHAUSTED ${(i.distanceTraveled / worldUnitsPerKm).toFixed(1)} km`,
       );
       return;
     }
@@ -8041,7 +8049,7 @@ function initializePlatformWaveArrivalPlan(missile: Missile) {
         : 0);
   }
   log(
-    `${platform.definition.name} SALVO TIMING / WAVE ${wave} / ${waveMissiles.length} WEAPONS / ARRIVAL WINDOW ${doctrine.arrivalWindow.toFixed(1)}s / TRACK RANGE ${(observedRange / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+    `${platform.definition.name} SALVO TIMING / WAVE ${wave} / ${waveMissiles.length} WEAPONS / ARRIVAL WINDOW ${doctrine.arrivalWindow.toFixed(1)}s / TRACK RANGE ${(observedRange / worldUnitsPerKm).toFixed(1)} km`,
   );
 }
 
@@ -8290,7 +8298,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
         Math.abs(track.quality - platformLaunch.lastDatalinkQuality) >= 0.12
       )
         log(
-          `${m.threatType} PLATFORM DATALINK UPDATE / ${platform.definition.name} / TQ ${Math.round(track.quality * 100)}% / UNC ${(track.uncertainty / 10).toFixed(1)} km`,
+          `${m.threatType} PLATFORM DATALINK UPDATE / ${platform.definition.name} / TQ ${Math.round(track.quality * 100)}% / UNC ${(track.uncertainty / worldUnitsPerKm).toFixed(1)} km`,
         );
       platformLaunch.datalinkValid = true;
       platformLaunch.lastDatalinkQuality = track.quality;
@@ -8343,7 +8351,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
   if (m.phase === "terminal" && !m.mesh.userData.seekerOn) {
     m.mesh.userData.seekerOn = true;
     log(
-      `${m.threatType} ACTIVE SEEKER SEARCH / NAV ${(guidanceRange / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+      `${m.threatType} ACTIVE SEEKER SEARCH / NAV ${(guidanceRange / worldUnitsPerKm).toFixed(1)} km`,
     );
     if (m.mesh.userData.terminalAttackMode !== "standard")
       log(
@@ -8369,7 +8377,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
       platformLaunch.terminalSeekerAcquired = true;
       m.mesh.userData.platformGuidanceMode = "ACTIVE HOMING";
       log(
-        `${m.threatType} ACTIVE SEEKER TARGET ACQUIRED / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km / OFF-BORESIGHT ${THREE.MathUtils.radToDeg(offBoresight).toFixed(1)} DEG`,
+        `${m.threatType} ACTIVE SEEKER TARGET ACQUIRED / ${(range / worldUnitsPerKm).toFixed(1)} km / OFF-BORESIGHT ${THREE.MathUtils.radToDeg(offBoresight).toFixed(1)} DEG`,
       );
     }
   }
@@ -8485,7 +8493,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     if (shipEcmEnabled && !m.mesh.userData.shipEcmBurnThrough) {
       m.mesh.userData.shipEcmBurnThrough = true;
       log(
-        `${m.threatType} SHIP ECM BURN-THROUGH / ${(range / WORLD_UNITS_PER_KM).toFixed(1)} km`,
+        `${m.threatType} SHIP ECM BURN-THROUGH / ${(range / worldUnitsPerKm).toFixed(1)} km`,
       );
     }
   }
@@ -8708,7 +8716,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     m.phase = "destroyed";
     m.mesh.visible = false;
     log(
-      `${m.threatType} SOFT KILL / SRBOC DECOY / CPA ${(closestShipRange / WORLD_UNITS_PER_KM).toFixed(2)} km`,
+      `${m.threatType} SOFT KILL / SRBOC DECOY / CPA ${(closestShipRange / worldUnitsPerKm).toFixed(2)} km`,
     );
     return;
   }
@@ -8729,7 +8737,7 @@ function updateIncomingMissile(m: Missile, dt: number) {
     applySubsystemDamage(m, profile.damage);
     destroyMissileVisual(m, "impact");
     log(
-      `${m.threatType} IMPACT / ${profile.damage}% DAMAGE / SAM ${Number.isFinite(nearestSam) ? (nearestSam / WORLD_UNITS_PER_KM).toFixed(1) + " km" : "NONE"} / HULL ${hullIntegrity}%`,
+      `${m.threatType} IMPACT / ${profile.damage}% DAMAGE / SAM ${Number.isFinite(nearestSam) ? (nearestSam / worldUnitsPerKm).toFixed(1) + " km" : "NONE"} / HULL ${hullIntegrity}%`,
     );
     updateShipStatus();
     if (hullIntegrity <= 0) {
@@ -8950,7 +8958,7 @@ function tick(now: number) {
     canvas.dataset.enemyPlatform = enemyPlatform.definition.id;
     canvas.dataset.surfaceRangeKm = (
       enemyPlatform.model.position.distanceTo(defender.position) /
-      WORLD_UNITS_PER_KM
+      worldUnitsPerKm
     ).toFixed(2);
     canvas.dataset.enemyPlatformReady = String(
       states.filter((state) => state === "ready").length,
@@ -9459,7 +9467,7 @@ function tick(now: number) {
   canvas.dataset.aircraftShipRangesKm = airCombat.aircraft
     .map(
       (aircraft) =>
-        `${aircraft.id}:${(aircraft.position.distanceTo(defender.position) / WORLD_UNITS_PER_KM).toFixed(1)}`,
+        `${aircraft.id}:${(aircraft.position.distanceTo(defender.position) / worldUnitsPerKm).toFixed(1)}`,
     )
     .join("|");
   canvas.dataset.airThrustStates = airCombat.aircraft
