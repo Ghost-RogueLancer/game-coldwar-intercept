@@ -45,9 +45,8 @@ jobs:
 
       - name: Verify seeker-specific defensive axes
         run: npm run verify:advanced-air-defense-axis
-
-      - name: Verify defensive side noise band
-        run: npm run verify:advanced-air-defense-side-band
+      - name: Verify scenario scale and Tacview coordinates
+        run: npm run verify:world-scale && npm run verify:acmi-export
       - name: Verify ARM emitter health and runtime
         run: npm run verify:arm-emitter-health && npm run verify:arm-runtime
       - name: Verify ARM catalog ballistics
@@ -55,6 +54,9 @@ jobs:
 
       - name: Verify ARM seeker lifecycle and flight ceilings
         run: npm run verify:arm-lifecycle
+
+      - name: Verify defensive side noise band
+        run: npm run verify:advanced-air-defense-side-band
 
       - name: Check whitespace errors
         shell: bash

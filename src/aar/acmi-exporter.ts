@@ -1,4 +1,5 @@
 import type { AarEvent, AarSnapshot } from "../combat-types";
+import { resolveWorldUnitsPerKm } from "../scenario-system/world-scale.js";
 
 export type AcmiExportOptions = {
   title: string;
@@ -6,6 +7,7 @@ export type AcmiExportOptions = {
   referenceLatitude?: number;
   referenceLongitude?: number;
   blueShipName: string;
+  worldUnitsPerKm?: number;
 };
 
 type AcmiObject = {
@@ -33,7 +35,6 @@ function isTerminal(object: AcmiObject): boolean {
   return object.disabled === true || object.state === "destroyed";
 }
 
-const WORLD_METERS = 100;
 const ALTITUDE_METERS = 50;
 
 function clean(value: string): string {
@@ -44,9 +45,10 @@ function coordinates(
   object: AcmiObject,
   latitude: number,
   longitude: number,
+  metersPerWorldUnit: number,
 ): string {
-  const north = -object.z * WORLD_METERS;
-  const east = object.x * WORLD_METERS;
+  const north = -object.z * metersPerWorldUnit;
+  const east = object.x * metersPerWorldUnit;
   const lat = latitude + north / 111_320;
   const lon = longitude + east / (111_320 * Math.cos((latitude * Math.PI) / 180));
   const altitude = Math.max(0, object.y * ALTITUDE_METERS);
@@ -265,6 +267,7 @@ export function exportTacviewAcmi(
 ): string {
   const latitude = options.referenceLatitude ?? 31.2;
   const longitude = options.referenceLongitude ?? 121.5;
+  const metersPerWorldUnit = 1000 / resolveWorldUnitsPerKm(options.worldUnitsPerKm);
   const ids = new Map<string, number>();
   const aliases = new Map<string, string>([
     ["blue-surface-ship", "ship:blue"],
@@ -327,7 +330,7 @@ export function exportTacviewAcmi(
       }
     for (const object of objects) {
       const id = idFor(object.key);
-      const properties = [`T=${coordinates(object, latitude, longitude)}`];
+      const properties = [`T=${coordinates(object, latitude, longitude, metersPerWorldUnit)}`];
       let firedBy: number | undefined;
       if (object.speed !== undefined) properties.push(`Speed=${object.speed.toFixed(2)}`);
       if (object.verticalSpeed !== undefined)
