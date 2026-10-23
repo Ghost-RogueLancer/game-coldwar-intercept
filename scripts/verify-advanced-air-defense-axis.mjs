@@ -18,6 +18,10 @@ assert.deepEqual(observed(new Map([[shooterId, organic]])), organic.position);
 assert.deepEqual(observed(undefined, new Map([[networkKey, network]])), network.position);
 assert.deepEqual(observed(undefined, new Map([[networkKey.replace("link16:", "link11:"), network]])), network.position);
 assert.deepEqual(observed(new Map([[shooterId, organic]]), new Map([[networkKey, network]])), organic.position);
+const fresh = track(10, .3, 30), near = track(9.6, .7, 40), older = track(9.2, .9, 50);
+assert.deepEqual(observed(new Map([[shooterId, fresh]]), new Map([
+  [networkKey, near], [networkKey.replace("link16:", "link11:"), older],
+])), near.position, "quality tie window must be anchored on the freshest observation");
 assert.equal(observed(undefined, new Map([[shooterId, network]])), undefined, "raw network keys are not observed track numbers");
 for (const bad of [track(4), track(11), track(NaN), track(9, .1), { ...track(9), uncertainty: Infinity },
   { ...track(9), position: new THREE.Vector3(NaN, 0, 0) }]) {
