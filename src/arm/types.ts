@@ -22,7 +22,7 @@ export interface EmitterTrack {
   source: "local-esm" | "datalink-cue" | "passive-fusion";
 }
 export interface ArmWeaponProfile {
-  id: "AGM-45A" | "AGM-88A"; seekerBands: readonly string[]; seekerRange: number;
+  id: "AGM-45A" | "AGM-88A" | "Kh-31P-C"; seekerBands: readonly string[]; seekerRange: number;
   seekerFovDeg: number; memoryDuration: number; reacquisitionWindow: number;
   homeOnJam: boolean; shutdownBehavior: "memory-only" | "memory-and-reacquire";
   seekerUpdateInterval: number;
