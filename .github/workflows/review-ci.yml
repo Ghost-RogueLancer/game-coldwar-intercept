@@ -62,6 +62,9 @@ jobs:
       - name: Verify Soviet SEAD era and seeker coverage
         run: npm run verify:soviet-sead-era
 
+      - name: Verify defensive side noise band
+        run: npm run verify:advanced-air-defense-side-band
+
       - name: Check whitespace errors
         shell: bash
         env:
