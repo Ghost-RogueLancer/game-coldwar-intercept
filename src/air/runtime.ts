@@ -8,7 +8,7 @@ import { ARM_WEAPONS } from "../arm/catalog.js";
 import { updateArmSeeker } from "../arm/seeker-runtime.js";
 import { emitterFromEntity } from "../arm/emitter-bridge.js";
 import { armReleaseAuthorization } from "../arm/mission-integration.js";
-import { ArmEmitterRuntime } from "../arm/emitter-runtime.js";
+import { ArmEmitterRuntime, emitterActivityChanged } from "../arm/emitter-runtime.js";
 import { ARM_EMITTERS } from "../arm/catalog.js";
 import { airRadarFactors, missileWarningProbability } from "./sensors";
 import {
@@ -488,6 +488,13 @@ export class AirCombatSystem {
     this.seenFleetOrders.clear();
     this.sovietSalvoCoordinator.reset();
     this.sovietSead.reset();
+    // `ArmEmitterRuntime.clear()` and this activity map were the only registry state that
+    // survived a scenario reset: the frame loop re-registers an emitter only when the id is
+    // absent, so the previous mission's instances - active flag, health, mode, lastActivatedAt -
+    // were carried into the next one, and stale activity entries suppressed the first
+    // RESTORED/CEASED edge for any reused platform id.
+    this.armEmitters.clear();
+    this.armEmitterActivity.clear();
     this.recordedStrikeWaveStates.clear();
     this.seenSalvoPlans.clear();
     this.externalLink16Published.clear();
@@ -675,7 +682,7 @@ export class AirCombatSystem {
         emitter.health = target.alive ? Math.max(0, Math.min(1, radarHealth)) : 0;
         this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const previous = this.armEmitterActivity.get(emitterId);
-        if (previous !== undefined && previous !== emitter.active)
+        if (emitterActivityChanged(previous, emitter.active))
           this.emit(time, "guidance", `${emitter.definitionId} ${emitter.active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: emitter.active ? "emitter-acquired" : "memory-track" });
         this.armEmitterActivity.set(emitterId, emitter.active);
       }
