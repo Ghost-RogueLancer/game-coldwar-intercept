@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { observedIlluminatorPosition, tacticalTrackNumber } from "./ai/illuminator-observation.js";
 import { createAirWeaponModel } from "../models/air-weapons.js";
 import { attachAirWeaponModel } from "./weapon-mounting.js";
 import { applyDeclaredWingSweep } from "./variable-geometry.js";
@@ -200,14 +201,6 @@ const angle = (a: THREE.Vector3, b: THREE.Vector3) =>
 function roll(seed: number) {
   const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
-}
-function tacticalTrackNumber(targetId: string) {
-  let hash = 2166136261;
-  for (const character of targetId) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `T-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 function rotateToward(
   current: THREE.Vector3,
@@ -668,15 +661,15 @@ export class AirCombatSystem {
         if (!this.armEmitters.emitters.has(emitterId)) this.armEmitters.register({ id: emitterId, platformId: target.id, definition, position: target.position, time });
         const emitter = this.armEmitters.emitters.get(emitterId)!;
         const active = Boolean(radiation?.radarEmitting || radiation?.jammerEmitting);
-        this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const radarHealth = target.kind === "aircraft"
           ? ((target as AirPlatformInstance).subsystemHealth.get("radar") ?? 100) / 100
           : 1;
         emitter.health = target.alive ? Math.max(0, Math.min(1, radarHealth)) : 0;
+        this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const previous = this.armEmitterActivity.get(emitterId);
-        if (previous !== undefined && previous !== active)
-          this.emit(time, "guidance", `${emitter.definitionId} ${active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: active ? "emitter-acquired" : "memory-track" });
-        this.armEmitterActivity.set(emitterId, active);
+        if (previous !== undefined && previous !== emitter.active)
+          this.emit(time, "guidance", `${emitter.definitionId} ${emitter.active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: emitter.active ? "emitter-acquired" : "memory-track" });
+        this.armEmitterActivity.set(emitterId, emitter.active);
       }
     }
     this.armEmitters.update(time, positions);
@@ -2169,6 +2162,28 @@ export class AirCombatSystem {
       }
     }
   }
+
+  /**
+   * The own-ship observation of the aircraft whose transmitter a semi-active seeker depends on,
+   * or undefined when no such observation exists. A semi-active missile only receives, so the
+   * Doppler filter a notch must null belongs to the illuminating platform, not to the missile.
+   *
+   * Resolved from the platform's own track tables only (the same way `AirCombatSystem` resolves
+   * the semi-active illumination cue from `a.tracks`), never from the shooter's authoritative
+   * state: an aircraft that has gone
+   * undetected, or a ship-based designator that produces no air track, degrades to undefined and
+   * the planner keeps today's line-of-sight geometry. The fresher of the organic and link tracks
+   * wins, and only a non-stale one is accepted, because `a.tracks` is never pruned.
+   */
+  private illuminatorObservationFor(
+    a: AirPlatformInstance,
+    missile: AirMissileInstance,
+    time: number,
+  ) {
+    return observedIlluminatorPosition({ shooterId: missile.shooterId,
+      guidance: missile.definition.guidance, tracks: a.tracks, networkTracks: a.networkTracks, time });
+  }
+
   private incomingFor(a: AirPlatformInstance, time: number) {
     for (const m of this.missiles.filter(
       (m) => m.alive && opposingSides(a, m) && m.targetId === a.id,
@@ -2672,6 +2687,10 @@ export class AirCombatSystem {
           warning: incoming.warning,
           estimatedTti: defense.timeToImpact,
           guidance: incoming.missile.definition.guidance,
+          // A semi-active seeker only receives; the transmitter whose Doppler filter the notch
+          // must null is the illuminating aircraft. Ship-launched semi-active shooters are not
+          // resolved here, so the planner falls back to the missile's own line of sight.
+          illuminatorPosition: this.illuminatorObservationFor(a, incoming.missile, time),
           preferredSide: a.formationIndex ? 1 : -1,
           altitude: a.position.y,
           speedRatio: a.velocity.length() /
@@ -2712,7 +2731,9 @@ export class AirCombatSystem {
       const illuminationTrack = illuminatingMissile
         ? a.tracks.get(illuminatingMissile.targetId)
         : undefined;
-      if (illuminationTrack) {
+      // An explicit advanced evasion command has priority over supporting our own
+      // semi-active shot. Normal illumination/gimbal checks decide whether it survives.
+      if (illuminationTrack && !(context.advancedAirAiEnabled && pilotHasReacted)) {
         const illuminationDirection = illuminationTrack.position
           .clone()
           .sub(a.position)
