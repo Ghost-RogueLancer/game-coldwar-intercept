@@ -1,44 +1,16 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readCatalogRecord } from "./catalog-record.mjs";
 import { stepAirToAirPropulsion } from "../src/air/missile-runtime.ts";
 
-// The ballistics must be read from the shipped catalogue, not restated here. A copy of these
-// numbers used to live in this file, so the gate kept passing while `src/air/catalog.ts` changed
-// underneath it — and it had already dropped `maximumFlightSeconds`, a field the catalogue
-// declares for every anti-radiation weapon. Reading the source is the same approach
-// `verify-mig29-catalog.mjs` already uses.
-const catalog = readFileSync(new URL("../src/air/catalog.ts", import.meta.url), "utf8");
+// Read actual catalog fields independent of whitespace, quoting and line breaks.
 const ARM_IDS = ["AGM-45A", "AGM-88A", "Kh-31P-C"];
-
-// One definition line per weapon in AIR_WEAPONS; anchored on `id:` so the loadout, hardpoint and
-// scenario lists that also mention these names cannot be mistaken for the definition.
-function catalogueEntry(id) {
-  const line = catalog
-    .split("\n")
-    .find((candidate) => candidate.includes(`"${id}": {`) && candidate.includes(`id:"${id}"`));
-  assert.ok(line, `${id} is no longer a single-line AIR_WEAPONS definition in src/air/catalog.ts`);
-  return line;
-}
-function number(input, key, id) {
-  const match = input.match(new RegExp(`(?:^|[^A-Za-z0-9_])${key}:(-?[0-9.]+)`));
-  assert.ok(match, `${id} is missing the ${key} field the ballistics gate depends on`);
-  const value = Number(match[1]);
-  assert.ok(Number.isFinite(value), `${id}.${key} is not a finite number: ${match[1]}`);
-  return value;
-}
 function readWeapon(id) {
-  const line = catalogueEntry(id);
-  return {
-    speed: number(line, "speed", id),
-    boostSeconds: number(line, "boostSeconds", id),
-    maxTurnRateDeg: number(line, "maxTurnRateDeg", id),
-    sustainSeconds: number(line, "sustainSeconds", id),
-    coastDragPerSecond: number(line, "coastDragPerSecond", id),
-    minimumSpeedFactor: number(line, "minimumSpeedFactor", id),
-    loftAltitude: number(line, "loftAltitude", id),
-    loftTransitionRange: number(line, "loftTransitionRange", id),
-    maximumFlightSeconds: number(line, "maximumFlightSeconds", id),
-  };
+  const weapon = readCatalogRecord(new URL("../src/air/catalog.ts", import.meta.url), "AIR_WEAPONS", id);
+  const result = { ...weapon, ...weapon.airToAirFlight };
+  for (const field of ["speed", "boostSeconds", "maxTurnRateDeg", "sustainSeconds", "coastDragPerSecond", "minimumSpeedFactor", "loftAltitude", "loftTransitionRange", "maximumFlightSeconds"]) {
+    assert.ok(Number.isFinite(result[field]), `${id}.${field} must be finite`);
+  }
+  return result;
 }
 
 const weapons = Object.fromEntries(ARM_IDS.map((id) => [id, readWeapon(id)]));
