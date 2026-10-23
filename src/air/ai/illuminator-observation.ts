@@ -22,15 +22,18 @@ export function observedIlluminatorPosition(input: {
   const number = tacticalTrackNumber(input.shooterId);
   const candidates = [input.tracks.get(input.shooterId),
     input.networkTracks.get(`link16:${number}`), input.networkTracks.get(`link11:${number}`)];
-  let best: AirTrack | undefined;
+  const usable: AirTrack[] = [];
   for (const track of candidates) {
     if (!track || !Number.isFinite(track.lastUpdate) || track.lastUpdate > input.time ||
         input.time - track.lastUpdate > 5 || !Number.isFinite(track.quality) || track.quality < .2 ||
         !Number.isFinite(track.uncertainty) || track.uncertainty < 0 ||
         ![track.position.x, track.position.y, track.position.z].every(Number.isFinite)) continue;
-    if (!best || (Math.abs(track.lastUpdate - best.lastUpdate) < .5
-      ? track.quality > best.quality || (track.quality === best.quality && track.uncertainty < best.uncertainty)
-      : track.lastUpdate > best.lastUpdate)) best = track;
+    usable.push(track);
   }
+  // Anchor the quality tie window on the freshest admissible observation, so
+  // chained pairwise ties cannot select a much older observation by iteration order.
+  const freshest = Math.max(...usable.map(track => track.lastUpdate));
+  const best = usable.filter(track => freshest - track.lastUpdate < .5)
+    .sort((a, b) => b.quality - a.quality || a.uncertainty - b.uncertainty || b.lastUpdate - a.lastUpdate)[0];
   return best?.position.clone();
 }
