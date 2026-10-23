@@ -1,4 +1,5 @@
 import { DATALINK_ERAS } from "../datalink/era.js";
+import { isValidWorldUnitsPerKm } from "./world-scale.js";
 import { LOST_COMMS_DOCTRINES } from "../lost-comms/doctrine-catalog.js";
 import { SOVIET_COMMAND_ERAS, sovietPlatformAvailable, sovietWeaponAvailable } from "../soviet-c2/era.js";
 import { SPACE_WEATHER_PRESETS } from "../space-weather/catalog.js";
@@ -84,7 +85,7 @@ export function validateScenarioDocument(input: unknown, catalogs: ScenarioValid
   else {
     if (!finite(document.simulation.seed)) fail("simulation.seed", "Finite deterministic seed is required");
     if (!finite(document.simulation.durationSeconds) || document.simulation.durationSeconds <= 0) fail("simulation.durationSeconds", "Positive duration is required");
-    if (!finite(document.simulation.worldUnitsPerKm) || document.simulation.worldUnitsPerKm <= 0) fail("simulation.worldUnitsPerKm", "Positive world scale is required");
+    if (!isValidWorldUnitsPerKm(document.simulation.worldUnitsPerKm)) fail("simulation.worldUnitsPerKm", "World scale must be finite and between 0.001 and 1000000 units per km");
     if (!text(document.simulation.datalinkEra) || !(document.simulation.datalinkEra in DATALINK_ERAS)) fail("simulation.datalinkEra", "Unknown datalink era");
     if (!text(document.simulation.sovietCommandEra) || !(document.simulation.sovietCommandEra in SOVIET_COMMAND_ERAS)) fail("simulation.sovietCommandEra", "Unknown Soviet command era");
     if (typeof document.simulation.advancedAirAi !== "boolean") fail("simulation.advancedAirAi", "advancedAirAi must be boolean");
