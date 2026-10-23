@@ -43,6 +43,9 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify seeker-specific defensive axes
+        run: npm run verify:advanced-air-defense-axis
+
       - name: Check whitespace errors
         shell: bash
         env:

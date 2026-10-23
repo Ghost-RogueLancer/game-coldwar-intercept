@@ -2,6 +2,35 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { planThreatResponse } from "../dist-test/air/ai/threat-response.js";
 import { notchManeuver } from "../dist-test/air/ai/maneuver-library.js";
+import { observedIlluminatorPosition, tacticalTrackNumber } from "../dist-test/air/ai/illuminator-observation.js";
+import { readFileSync } from "node:fs";
+
+const shooterId = "red-shooter";
+const track = (lastUpdate, quality = .8, x = 10) => ({
+  targetId: shooterId, position: new THREE.Vector3(x, 40, -80), velocity: new THREE.Vector3(),
+  quality, uncertainty: 4, lastUpdate, classification: "aircraft",
+});
+const observed = (tracks = new Map(), networkTracks = new Map(), guidance = "semi-active-radar") =>
+  observedIlluminatorPosition({ shooterId, tracks, networkTracks, guidance, time: 10 });
+const networkKey = `link16:${tacticalTrackNumber(shooterId)}`;
+const organic = track(9, .8), network = track(9.2, .3, 20);
+assert.deepEqual(observed(new Map([[shooterId, organic]])), organic.position);
+assert.deepEqual(observed(undefined, new Map([[networkKey, network]])), network.position);
+assert.deepEqual(observed(undefined, new Map([[networkKey.replace("link16:", "link11:"), network]])), network.position);
+assert.deepEqual(observed(new Map([[shooterId, organic]]), new Map([[networkKey, network]])), organic.position);
+assert.equal(observed(undefined, new Map([[shooterId, network]])), undefined, "raw network keys are not observed track numbers");
+for (const bad of [track(4), track(11), track(NaN), track(9, .1), { ...track(9), uncertainty: Infinity },
+  { ...track(9), position: new THREE.Vector3(NaN, 0, 0) }]) {
+  assert.equal(observed(new Map([[shooterId, bad]])), undefined);
+}
+assert.equal(observed(new Map([[shooterId, organic]]), undefined, "active-radar"), undefined);
+const copy = observed(new Map([[shooterId, organic]]));
+copy.x = 999;
+assert.equal(organic.position.x, 10, "planner must not mutate stored observations");
+const runtimeSource = readFileSync(new URL("../src/air/runtime.ts", import.meta.url), "utf8");
+assert.match(runtimeSource, /return observedIlluminatorPosition\(/);
+assert.match(runtimeSource, /if \(illuminationTrack && !\(context\.advancedAirAiEnabled && pilotHasReacted\)\)/,
+  "illumination support must not overwrite advanced evasion");
 
 const own = new THREE.Vector3(0, 40, 0);
 const heading = new THREE.Vector3(0, 0, -1);

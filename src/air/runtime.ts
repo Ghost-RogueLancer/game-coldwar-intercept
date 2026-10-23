@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { observedIlluminatorPosition, tacticalTrackNumber } from "./ai/illuminator-observation.js";
 import { createAirWeaponModel } from "../models/air-weapons.js";
 import { attachAirWeaponModel } from "./weapon-mounting.js";
 import { applyDeclaredWingSweep } from "./variable-geometry.js";
@@ -200,14 +201,6 @@ const angle = (a: THREE.Vector3, b: THREE.Vector3) =>
 function roll(seed: number) {
   const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
-}
-function tacticalTrackNumber(targetId: string) {
-  let hash = 2166136261;
-  for (const character of targetId) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `T-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 function rotateToward(
   current: THREE.Vector3,
@@ -2187,13 +2180,8 @@ export class AirCombatSystem {
     missile: AirMissileInstance,
     time: number,
   ) {
-    if (missile.definition.guidance !== "semi-active-radar") return undefined;
-    const candidates = [a.tracks.get(missile.shooterId), a.networkTracks.get(missile.shooterId)];
-    let best: AirTrack | undefined;
-    for (const track of candidates)
-      if (track && (!best || track.lastUpdate > best.lastUpdate)) best = track;
-    if (!best || time - best.lastUpdate > 5) return undefined;
-    return best.position.clone();
+    return observedIlluminatorPosition({ shooterId: missile.shooterId,
+      guidance: missile.definition.guidance, tracks: a.tracks, networkTracks: a.networkTracks, time });
   }
 
   private incomingFor(a: AirPlatformInstance, time: number) {
@@ -2743,7 +2731,9 @@ export class AirCombatSystem {
       const illuminationTrack = illuminatingMissile
         ? a.tracks.get(illuminatingMissile.targetId)
         : undefined;
-      if (illuminationTrack) {
+      // An explicit advanced evasion command has priority over supporting our own
+      // semi-active shot. Normal illumination/gimbal checks decide whether it survives.
+      if (illuminationTrack && !(context.advancedAirAiEnabled && pilotHasReacted)) {
         const illuminationDirection = illuminationTrack.position
           .clone()
           .sub(a.position)
