@@ -43,6 +43,11 @@ jobs:
       - name: Verify documentation links
         run: npm run verify:docs
 
+      - name: Verify ARM emitter health and runtime
+        run: npm run verify:arm-emitter-health && npm run verify:arm-runtime
+      - name: Verify ARM catalog ballistics
+        run: node scripts/verify-catalog-record.mjs && node scripts/verify-arm-ballistics.mjs
+
       - name: Check whitespace errors
         shell: bash
         env:
@@ -104,6 +109,9 @@ jobs:
 
       - name: Verify application loads and advances one frame
         run: npm run verify:app-smoke
+
+      - name: Verify setup fields isolate keyboard shortcuts
+        run: npm run verify:setup-keyboard-focus
 
       - name: Stop browser smoke server
         if: always()
