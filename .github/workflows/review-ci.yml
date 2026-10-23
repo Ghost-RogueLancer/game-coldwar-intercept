@@ -45,6 +45,9 @@ jobs:
 
       - name: Verify seeker-specific defensive axes
         run: npm run verify:advanced-air-defense-axis
+
+      - name: Verify defensive side noise band
+        run: npm run verify:advanced-air-defense-side-band
       - name: Verify ARM emitter health and runtime
         run: npm run verify:arm-emitter-health && npm run verify:arm-runtime
       - name: Verify ARM catalog ballistics

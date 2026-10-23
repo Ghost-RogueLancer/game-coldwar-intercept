@@ -19,9 +19,7 @@ const bearing = (deg, range) => {
 // The side the aircraft is told to turn to, expressed exactly as air/runtime.ts:3116 does:
 // the sign of heading x desiredDirection along the vertical axis drives the roll direction.
 const turnSide = (desired, threatPosition) => {
-  const radial = new THREE.Vector3(threatPosition.x - ownPosition.x, 0,
-    threatPosition.z - ownPosition.z).normalize();
-  const sign = radial.clone().cross(desired.clone().setY(0)).y;
+  const sign = currentHeading.clone().cross(desired.clone().setY(0)).y;
   return Math.abs(sign) < 1e-9 ? 0 : Math.sign(sign);
 };
 const planFor = (threatPosition, uncertainty, overrides = {}) => planThreatResponse({
@@ -34,7 +32,9 @@ const planFor = (threatPosition, uncertainty, overrides = {}) => planThreatRespo
     uncertainty,
   },
   estimatedTti: 14,
-  guidance: "active-radar",
+  // A semi-active threat with no observed illuminator uses the LOS axis.
+  // Active-radar geometry is tested separately against its observed velocity.
+  guidance: "semi-active-radar",
   preferredSide: 1,
   altitude: 40,
   speedRatio: 0.7,
@@ -69,6 +69,8 @@ assert.equal(sideFor(bearing(8, 60), passive), 1,
 const worst = warningUncertainty(20, 150);
 assert.equal(sideFor(bearing(30, 20), worst), 1,
   "even at the widest band the cap must let a real quarter-turn cross over");
+assert.equal(sideFor(bearing(8, 20), 50), -1,
+  "uncertainty enclosing ownship must use the widest band, not the minimum");
 
 // 4. Sensor jitter alone must never overturn the side, across every (warningRange, range)
 //    state the runtime can actually produce. Offsets use the runtime's own +-uncertainty/2.
