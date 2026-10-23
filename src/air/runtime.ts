@@ -9,7 +9,7 @@ import { ARM_WEAPONS } from "../arm/catalog.js";
 import { updateArmSeeker } from "../arm/seeker-runtime.js";
 import { emitterFromEntity } from "../arm/emitter-bridge.js";
 import { armReleaseAuthorization } from "../arm/mission-integration.js";
-import { ArmEmitterRuntime } from "../arm/emitter-runtime.js";
+import { ArmEmitterRuntime, emitterActivityChanged } from "../arm/emitter-runtime.js";
 import { ARM_EMITTERS } from "../arm/catalog.js";
 import { airRadarFactors, missileWarningProbability } from "./sensors";
 import {
@@ -84,6 +84,7 @@ import {
   airToAirMissilePhase,
   stepAirToAirPropulsion,
   shouldContinueAfterTargetLoss,
+  shouldContinueArmFlight,
 } from "./missile-runtime";
 import { updateAntiShipGuidance } from "../anti-ship-guidance";
 import { radarCountermeasureContest } from "../radar-countermeasures";
@@ -480,6 +481,13 @@ export class AirCombatSystem {
     this.seenFleetOrders.clear();
     this.sovietSalvoCoordinator.reset();
     this.sovietSead.reset();
+    // `ArmEmitterRuntime.clear()` and this activity map were the only registry state that
+    // survived a scenario reset: the frame loop re-registers an emitter only when the id is
+    // absent, so the previous mission's instances - active flag, health, mode, lastActivatedAt -
+    // were carried into the next one, and stale activity entries suppressed the first
+    // RESTORED/CEASED edge for any reused platform id.
+    this.armEmitters.clear();
+    this.armEmitterActivity.clear();
     this.recordedStrikeWaveStates.clear();
     this.seenSalvoPlans.clear();
     this.externalLink16Published.clear();
@@ -667,7 +675,7 @@ export class AirCombatSystem {
         emitter.health = target.alive ? Math.max(0, Math.min(1, radarHealth)) : 0;
         this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const previous = this.armEmitterActivity.get(emitterId);
-        if (previous !== undefined && previous !== emitter.active)
+        if (emitterActivityChanged(previous, emitter.active))
           this.emit(time, "guidance", `${emitter.definitionId} ${emitter.active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: emitter.active ? "emitter-acquired" : "memory-track" });
         this.armEmitterActivity.set(emitterId, emitter.active);
       }
@@ -3659,7 +3667,11 @@ export class AirCombatSystem {
       if (armState.lastKnownPosition) missile.commandPoint.copy(armState.lastKnownPosition);
       missile.age += dt; this.integrateAirToAirMissile(missile, missile.commandPoint.clone(), dt);
       if (emitter && target.kind !== "decoy" && missile.position.distanceTo(emitter.position)<=missile.definition.proximityRadius) { target.applyDamage(missile.definition.damage,missile.position); this.emit(time,"kill",`${missile.definition.name} ARM EMITTER HIT / ${emitter.id}`); this.terminateMissile(missile,"hit",time); }
-      else if (armState.mode === "lost" || missile.age > 120) this.terminateMissile(missile,"miss",time);
+      else if (armState.mode === "lost" ||
+        !shouldContinueArmFlight({
+          age: missile.age,
+          maximumFlightSeconds: missile.definition.airToAirFlight?.maximumFlightSeconds,
+        })) this.terminateMissile(missile,"miss",time);
       return;
     }
     const range = missile.position.distanceTo(target.position);

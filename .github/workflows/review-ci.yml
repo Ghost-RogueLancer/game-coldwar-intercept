@@ -53,6 +53,9 @@ jobs:
       - name: Verify ARM catalog ballistics
         run: node scripts/verify-catalog-record.mjs && node scripts/verify-arm-ballistics.mjs
 
+      - name: Verify ARM seeker lifecycle and flight ceilings
+        run: npm run verify:arm-lifecycle
+
       - name: Check whitespace errors
         shell: bash
         env:
