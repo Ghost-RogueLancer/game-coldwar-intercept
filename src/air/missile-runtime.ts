@@ -84,3 +84,22 @@ export function shouldContinueAfterTargetLoss(input: {
 }) {
   return input.age <= input.maximumAge && input.altitude >= 0;
 }
+
+/**
+ * The ceiling an anti-radiation weapon stops flying at, in seconds.
+ *
+ * `airToAirFlight.maximumFlightSeconds` is the catalogue's own answer and is what the generic
+ * target-loss path already consults (`air/runtime.ts:3255`, `?? 180`), but the anti-radiation
+ * branch used a stopwatch literal instead, so the declared 75 / 125 / 100 s for AGM-45A / AGM-88A
+ * / Kh-31P-C were dead fields there. The fallback keeps today's 120 s for any anti-radiation
+ * weapon that declares no flight profile, so this changes behaviour only where the catalogue
+ * actually states an intent.
+ */
+export const ARM_DEFAULT_MAXIMUM_FLIGHT_SECONDS = 120;
+
+export function shouldContinueArmFlight(input: {
+  age: number;
+  maximumFlightSeconds?: number;
+}) {
+  return input.age <= (input.maximumFlightSeconds ?? ARM_DEFAULT_MAXIMUM_FLIGHT_SECONDS);
+}
