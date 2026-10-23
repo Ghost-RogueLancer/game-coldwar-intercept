@@ -1,3 +1,5 @@
+import { DEFAULT_WORLD_UNITS_PER_KM, resolveWorldUnitsPerKm } from "../scenario-system/world-scale.js";
+
 export type TacticalRadarClassification = "unknown" | "aircraft" | "ship" | "missile";
 export type TacticalRadarSource = "organic" | "link11" | "link16" | "esm" | "irst" | "passive-fusion";
 export type TacticalRadarOrientation = "north-up" | "heading-up";
@@ -47,10 +49,10 @@ export interface TacticalRadarOptions {
 }
 
 const RANGE_STEPS_KM = [25, 50, 100, 200] as const;
-const WORLD_UNITS_PER_KM = 10;
 
 export class TacticalRadarDisplay {
   private rangeIndex = 2;
+  private worldUnitsPerKm = DEFAULT_WORLD_UNITS_PER_KM;
   private orientation: TacticalRadarOrientation = "north-up";
   private hits: Array<{ id: string; x: number; y: number; radius: number }> = [];
 
@@ -73,6 +75,15 @@ export class TacticalRadarDisplay {
     this.updateControls();
   }
 
+  /**
+   * Applies the scale declared by the active scenario. Range rings are labelled in
+   * kilometres, so the pixels-per-world-unit conversion has to follow the scenario
+   * grid or the rings misreport every track distance.
+   */
+  setWorldScale(declaredUnitsPerKm: number | undefined): void {
+    this.worldUnitsPerKm = resolveWorldUnitsPerKm(declaredUnitsPerKm);
+  }
+
   render(frame: TacticalRadarFrame) {
     const canvas = this.options.canvas;
     const ctx = canvas.getContext("2d");
@@ -80,7 +91,7 @@ export class TacticalRadarDisplay {
     const w = canvas.width, h = canvas.height, cx = w / 2, cy = h / 2;
     const radius = Math.min(w, h) * 0.405;
     const rangeKm = RANGE_STEPS_KM[this.rangeIndex];
-    const pixelsPerWorld = radius / (rangeKm * WORLD_UNITS_PER_KM);
+    const pixelsPerWorld = radius / (rangeKm * this.worldUnitsPerKm);
     const rotation = this.orientation === "heading-up" ? frame.ownerHeadingRad : 0;
     const project = (x: number, z: number) => {
       const dx = x - frame.ownerX, dz = z - frame.ownerZ;
@@ -169,7 +180,7 @@ export class TacticalRadarDisplay {
         const vdx = speed.x - raw.x, vdy = speed.y - raw.y, vl = Math.max(0.001, Math.hypot(vdx, vdy));
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + vdx / vl * vectorScale, y + vdy / vl * vectorScale); ctx.stroke();
       }
-      const range = Math.hypot(track.x - frame.ownerX, track.z - frame.ownerZ) / WORLD_UNITS_PER_KM;
+      const range = Math.hypot(track.x - frame.ownerX, track.z - frame.ownerZ) / this.worldUnitsPerKm;
       const label = `${track.id.slice(-8).toUpperCase()} ${track.source === "organic" ? "ORG" : track.source.toUpperCase()} Q${track.quality.toFixed(2)}${outside ? ` ${range.toFixed(0)}KM` : ""}${isStale ? ` A${age.toFixed(0)}` : ""}`;
       ctx.font = "8px Consolas, monospace";
       const labelWidth = ctx.measureText(label).width;
