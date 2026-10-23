@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { isTypingTarget } from "./input";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -9857,7 +9858,11 @@ function cycleAircraft(
   );
   return candidates[(currentIndex + 1) % candidates.length].id;
 }
+
+// Sandbox numeric fields capture digits and letters such as r and n, so global
+// hotkeys must not fire while the player is typing into a form control.
 addEventListener("keydown", (e) => {
+  if (isTypingTarget(e)) return;
   if (e.code === "Space" && !scenarioBriefingLocked) {
     running = !running;
     activeGuidanceRuntime?.setPaused(!running);
@@ -9866,6 +9871,7 @@ addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "r") location.reload();
 });
 addEventListener("keydown", (e) => {
+  if (isTypingTarget(e)) return;
   if (e.key === "1") {
     cinematic = false;
     viewMode = 1;
