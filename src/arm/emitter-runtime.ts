@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import type { EmitterDefinition, EmitterInstance } from "./types.js";
+// Initial silence is the baseline; the first observed transmission is an event.
+export function emitterActivityChanged(previous: boolean | undefined, active: boolean) {
+  return previous !== active && (previous !== undefined || active);
+}
 
 export class ArmEmitterRuntime {
   readonly emitters = new Map<string, EmitterInstance>();
