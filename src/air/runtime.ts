@@ -487,6 +487,13 @@ export class AirCombatSystem {
     this.seenFleetOrders.clear();
     this.sovietSalvoCoordinator.reset();
     this.sovietSead.reset();
+    // `ArmEmitterRuntime.clear()` and this activity map were the only registry state that
+    // survived a scenario reset: the frame loop re-registers an emitter only when the id is
+    // absent, so the previous mission's instances - active flag, health, mode, lastActivatedAt -
+    // were carried into the next one, and stale activity entries suppressed the first
+    // RESTORED/CEASED edge for any reused platform id.
+    this.armEmitters.clear();
+    this.armEmitterActivity.clear();
     this.recordedStrikeWaveStates.clear();
     this.seenSalvoPlans.clear();
     this.externalLink16Published.clear();
