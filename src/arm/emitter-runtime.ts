@@ -17,13 +17,13 @@ export class ArmEmitterRuntime {
     // platform was dead, and `lastDeactivatedAt` was never stamped because the real down-edge
     // happened outside this method.
     const radiating = active && emitter.health > 0;
-    if(emitter.active===radiating) return true;
+    if(emitter.active===radiating) { emitter.mode=mode; emitter.emissionStrength=radiating?Math.max(.05,emitter.health):0; return true; }
     emitter.active=radiating; emitter.mode=mode; emitter.emissionStrength=radiating?Math.max(.05,emitter.health):0;
     if(radiating) emitter.lastActivatedAt=time; else emitter.lastDeactivatedAt=time;
     return true;
   }
   update(now:number, positions:ReadonlyMap<string,THREE.Vector3>) {
-    for(const emitter of this.emitters.values()) { const p=positions.get(emitter.platformId); if(p) emitter.position.copy(p); if(emitter.health<=0) { emitter.active=false; emitter.emissionStrength=0; } }
+    for(const emitter of this.emitters.values()) { const p=positions.get(emitter.platformId); if(p) emitter.position.copy(p); this.setActive(emitter.id,emitter.active,now,emitter.mode); }
   }
   remove(id:string){ return this.emitters.delete(id); }
   clear(){ this.emitters.clear(); }

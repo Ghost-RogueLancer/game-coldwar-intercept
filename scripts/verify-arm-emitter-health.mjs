@@ -57,5 +57,17 @@ assert.equal(emitter.active, true, "a repaired transmitter must be able to radia
 assert.equal(emitter.emissionStrength, 0.6);
 assert.equal(emitter.lastActivatedAt, 30);
 
+emitter.health = 0.3;
+runtime.setActive(emitter.id, true, 31, "jam");
+assert.equal(emitter.emissionStrength, 0.3);
+assert.equal(emitter.mode, "jam");
+assert.equal(emitter.lastActivatedAt, 30);
+emitter.health = 0;
+runtime.update(32, positions);
+assert.equal(emitter.active, false);
+assert.equal(emitter.lastDeactivatedAt, 32);
+runtime.update(33, positions);
+assert.equal(emitter.lastDeactivatedAt, 32);
+
 console.log(JSON.stringify({ settled, afterRepair: { active: emitter.active,
   emissionStrength: emitter.emissionStrength, lastActivatedAt: emitter.lastActivatedAt } }));
