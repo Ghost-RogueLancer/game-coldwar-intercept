@@ -46,6 +46,9 @@ jobs:
       - name: Verify ARM catalog ballistics
         run: node scripts/verify-catalog-record.mjs && node scripts/verify-arm-ballistics.mjs
 
+      - name: Verify Soviet SEAD era and seeker coverage
+        run: npm run verify:soviet-sead-era
+
       - name: Check whitespace errors
         shell: bash
         env:

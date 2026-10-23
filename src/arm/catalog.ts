@@ -2,6 +2,8 @@ import type { ArmWeaponProfile, EmitterDefinition } from "./types.js";
 export const ARM_WEAPONS: Readonly<Record<"AGM-45A"|"AGM-88A"|"Kh-31P-C", ArmWeaponProfile>> = {
   "AGM-45A": { id:"AGM-45A", seekerBands:["S","C","X"], seekerRange:120, seekerFovDeg:70, memoryDuration:8, reacquisitionWindow:0, homeOnJam:false, shutdownBehavior:"memory-only", seekerUpdateInterval:.25 },
   "AGM-88A": { id:"AGM-88A", seekerBands:["S","C","X","Ku"], seekerRange:180, seekerFovDeg:90, memoryDuration:24, reacquisitionWindow:18, homeOnJam:true, shutdownBehavior:"memory-and-reacquire", seekerUpdateInterval:.2 },
+  // Scenario balance assumptions for the late-Soviet concept, not measured seeker specifications.
+  // Range/FOV mirror AIR_WEAPONS; memory and reacquisition use the shared simplified seeker model.
   "Kh-31P-C": { id:"Kh-31P-C", seekerBands:["S","C","X","Ku"], seekerRange:155, seekerFovDeg:78, memoryDuration:16, reacquisitionWindow:12, homeOnJam:true, shutdownBehavior:"memory-and-reacquire", seekerUpdateInterval:.2 },
 };
 export const ARM_EMITTERS: Readonly<Record<string, EmitterDefinition>> = {
