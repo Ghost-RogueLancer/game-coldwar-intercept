@@ -669,15 +669,15 @@ export class AirCombatSystem {
         if (!this.armEmitters.emitters.has(emitterId)) this.armEmitters.register({ id: emitterId, platformId: target.id, definition, position: target.position, time });
         const emitter = this.armEmitters.emitters.get(emitterId)!;
         const active = Boolean(radiation?.radarEmitting || radiation?.jammerEmitting);
-        this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const radarHealth = target.kind === "aircraft"
           ? ((target as AirPlatformInstance).subsystemHealth.get("radar") ?? 100) / 100
           : 1;
         emitter.health = target.alive ? Math.max(0, Math.min(1, radarHealth)) : 0;
+        this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const previous = this.armEmitterActivity.get(emitterId);
-        if (previous !== undefined && previous !== active)
-          this.emit(time, "guidance", `${emitter.definitionId} ${active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: active ? "emitter-acquired" : "memory-track" });
-        this.armEmitterActivity.set(emitterId, active);
+        if (previous !== undefined && previous !== emitter.active)
+          this.emit(time, "guidance", `${emitter.definitionId} ${emitter.active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: emitter.active ? "emitter-acquired" : "memory-track" });
+        this.armEmitterActivity.set(emitterId, emitter.active);
       }
     }
     this.armEmitters.update(time, positions);
