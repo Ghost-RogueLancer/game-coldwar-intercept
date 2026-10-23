@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { ARM_WEAPONS } from "../src/arm/catalog.ts";
 import { updateArmSeeker } from "../src/arm/seeker-runtime.ts";
-import { ArmEmitterRuntime } from "../src/arm/emitter-runtime.ts";
+import { ArmEmitterRuntime, emitterActivityChanged } from "../src/arm/emitter-runtime.ts";
 import { armReleaseAuthorization } from "../src/arm/mission-integration.ts";
 const emitter={id:"spg",platformId:"cg57",definitionId:"AN-SPG-49-fire-control",position:new THREE.Vector3(80,0,0),active:true,mode:"guidance",emissionStrength:1,lastActivatedAt:0,lastDeactivatedAt:0,health:1,decoy:false,band:"X"};
 const runtime=new ArmEmitterRuntime(); const persistent=runtime.register({id:"cg57:spg",platformId:"cg57",definition:{id:"AN-SPG-49-fire-control",name:"SPG",emitterType:"fire-control-radar",band:"X",nominalPower:1,detectionSignature:1,frequencyAgility:.2,shutdownDelay:1,restartDelay:2},position:new THREE.Vector3(80,0,0)}); runtime.setActive(persistent.id,true,1,"guidance"); assert.equal(persistent.active,true); runtime.setActive(persistent.id,false,2); assert.equal(persistent.emissionStrength,0);
@@ -90,4 +90,18 @@ assert.ok(resetBody.indexOf("this.armEmitters.clear()") > resetBody.indexOf("thi
 assert.ok((resetBody.match(/\.clear\(\)/g) || []).length >= 12,
   "reset() is expected to clear a long list of registries; a shorter body means this check lost its context");
 
-console.log("ARM runtime verification passed:", JSON.stringify({ clearedAfterReset: true }));
+const activity = new Map();
+const transitions = [];
+function observe(id, active) {
+  if (emitterActivityChanged(activity.get(id), active)) transitions.push(active);
+  activity.set(id, active);
+}
+observe("radar", false); // Initial silence is not a transition.
+observe("radar", true);
+observe("radar", true);
+observe("radar", false);
+activity.clear(); // The same id in a new scenario must report its initial emission.
+observe("radar", true);
+assert.deepEqual(transitions, [true, false, true]);
+assert.match(runtimeSource, /if \(emitterActivityChanged\(previous, emitter\.active\)\)/);
+console.log("ARM runtime verification passed:", JSON.stringify({ clearedAfterReset: true, transitions }));

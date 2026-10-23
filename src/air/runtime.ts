@@ -8,7 +8,7 @@ import { ARM_WEAPONS } from "../arm/catalog.js";
 import { updateArmSeeker } from "../arm/seeker-runtime.js";
 import { emitterFromEntity } from "../arm/emitter-bridge.js";
 import { armReleaseAuthorization } from "../arm/mission-integration.js";
-import { ArmEmitterRuntime } from "../arm/emitter-runtime.js";
+import { ArmEmitterRuntime, emitterActivityChanged } from "../arm/emitter-runtime.js";
 import { ARM_EMITTERS } from "../arm/catalog.js";
 import { airRadarFactors, missileWarningProbability } from "./sensors";
 import {
@@ -681,7 +681,7 @@ export class AirCombatSystem {
         emitter.health = target.alive ? Math.max(0, Math.min(1, radarHealth)) : 0;
         this.armEmitters.setActive(emitterId, active, time, radiation?.jammerEmitting ? "jam" : suffix === "fire-control-emitter" ? "guidance" : "search");
         const previous = this.armEmitterActivity.get(emitterId);
-        if (previous !== undefined && previous !== emitter.active)
+        if (emitterActivityChanged(previous, emitter.active))
           this.emit(time, "guidance", `${emitter.definitionId} ${emitter.active ? "EMISSION RESTORED" : "EMISSION CEASED"} / ${emitterId}`, { entityId: target.id, targetEmitterId: emitterId, armSeekerMode: emitter.active ? "emitter-acquired" : "memory-track" });
         this.armEmitterActivity.set(emitterId, emitter.active);
       }
